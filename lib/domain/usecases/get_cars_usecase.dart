@@ -24,6 +24,8 @@ class GetCars implements UseCase<List<CarEntity>, GetCarsParams> {
       city: params.city,
       minMileage: params.minMileage,
       maxMileage: params.maxMileage,
+      minYear: params.minYear,
+      maxYear: params.maxYear,
       engineSize: params.engineSize,
       bodyType: params.bodyType,
       transmission: params.transmission,
@@ -46,6 +48,8 @@ class GetCarsParams extends Equatable {
   final String? city;
   final int? minMileage;
   final int? maxMileage;
+  final int? minYear;
+  final int? maxYear;
   final int? engineSize;
   final BodyType? bodyType;
   final TransmissionType? transmission;
@@ -65,6 +69,8 @@ class GetCarsParams extends Equatable {
     this.city,
     this.minMileage,
     this.maxMileage,
+    this.minYear,
+    this.maxYear,
     this.engineSize,
     this.bodyType,
     this.transmission,
@@ -86,6 +92,8 @@ class GetCarsParams extends Equatable {
         city,
         minMileage,
         maxMileage,
+        minYear,
+        maxYear,
         engineSize,
         bodyType,
         transmission,

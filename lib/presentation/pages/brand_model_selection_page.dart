@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../domain/entities/brand_entity.dart';
 import '../bloc/car/car_bloc.dart';
 import '../bloc/car/car_event.dart';
 import '../bloc/car/car_state.dart';
@@ -14,132 +15,112 @@ class BrandModelSelectionPage extends StatefulWidget {
 }
 
 class _BrandModelSelectionPageState extends State<BrandModelSelectionPage> {
-  String? _selectedBrand;
+  BrandEntity? _selectedBrand;
+  SeriesModels? _selectedSeries;
   String? _selectedModel;
-  List<String> _brands = [];
+
+  List<BrandEntity> _brands = [];
+  List<SeriesModels> _seriesModels = [];
   List<String> _models = [];
 
   @override
   void initState() {
     super.initState();
-    context.read<CarBloc>().add(const GetUniqueBrandsEvent());
+    context.read<CarBloc>().add(const GetAllBrandsEvent());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Marka ve Model Seçimi'),
+        title: const Text('Araç Seçimi'),
         backgroundColor: AppColors.background,
         elevation: 0,
       ),
       body: BlocConsumer<CarBloc, CarState>(
         listener: (context, state) {
-          if (state is CarBrandsLoaded) {
+          if (state is AllBrandsLoaded) {
+            setState(() => _brands = state.brands);
+          } else if (state is SeriesAndModelsLoaded) {
             setState(() {
-              _brands = state.brands;
-            });
-          } else if (state is CarModelsLoaded) {
-            setState(() {
-              _models = state.models;
-              // Reset selected model if the current one is not in the new list
-              if (_selectedModel != null && !_models.contains(_selectedModel)) {
-                _selectedModel = null;
-              }
+              _seriesModels = state.seriesModels;
+              _selectedSeries = null;
+              _selectedModel = null;
+              _models = [];
             });
           } else if (state is CarError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message)));
           }
         },
         builder: (context, state) {
-          if (state is CarLoading && (_brands.isEmpty || _models.isEmpty)) {
-            return const Center(child: CircularProgressIndicator());
-          }
           return Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(24.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Marka Seçin',
-                  style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
+                _buildDropdown<BrandEntity>(
+                  label: 'Marka Seçin',
                   value: _selectedBrand,
-                  decoration: InputDecoration(
-                    hintText: 'Marka',
-                    filled: true,
-                    fillColor: AppColors.surface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  dropdownColor: AppColors.surface,
-                  style: AppTextStyles.input.copyWith(color: AppColors.textPrimary),
-                  items: _brands.map((brand) => DropdownMenuItem(value: brand, child: Text(brand))).toList(),
-                  onChanged: (value) {
+                  items: _brands.map((b) => DropdownMenuItem(value: b, child: Text(b.name))).toList(),
+                  onChanged: (brand) {
                     setState(() {
-                      _selectedBrand = value;
-                      _selectedModel = null; // Reset model when brand changes
-                      if (value != null) {
-                        context.read<CarBloc>().add(GetModelsByBrandEvent(brand: value));
-                      } else {
-                        _models = []; // Clear models if no brand is selected
-                      }
+                      _selectedBrand = brand;
+                      _selectedSeries = null;
+                      _selectedModel = null;
+                      _seriesModels = [];
+                      _models = [];
                     });
+                    if (brand != null) {
+                      context.read<CarBloc>().add(GetSeriesAndModelsEvent(brandId: brand.id));
+                    }
                   },
+                  hint: 'Marka seçin',
                 ),
                 const SizedBox(height: 20),
-                Text(
-                  'Model Seçin',
-                  style: AppTextStyles.subtitle.copyWith(color: AppColors.textPrimary),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: _selectedModel,
-                  decoration: InputDecoration(
-                    hintText: 'Model',
-                    filled: true,
-                    fillColor: AppColors.surface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                  dropdownColor: AppColors.surface,
-                  style: AppTextStyles.input.copyWith(color: AppColors.textPrimary),
-                  items: _models.map((model) => DropdownMenuItem(value: model, child: Text(model))).toList(),
-                  onChanged: (_selectedBrand != null)
-                      ? (value) {
+                _buildDropdown<SeriesModels>(
+                  label: 'Seri Seçin',
+                  value: _selectedSeries,
+                  items: _seriesModels.map((s) => DropdownMenuItem(value: s, child: Text(s.series))).toList(),
+                  onChanged: _selectedBrand == null ? null : (series) {
                     setState(() {
-                      _selectedModel = value;
+                      _selectedSeries = series;
+                      _selectedModel = null;
+                      _models = series?.models ?? [];
                     });
-                  }
-                      : null,
-                  // Disable model selection if no brand is selected
-                  // isEnabled: _selectedBrand != null,
+                  },
+                  hint: _selectedBrand == null ? 'Önce marka seçin' : 'Seri seçin',
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 20),
+                _buildDropdown<String>(
+                  label: 'Model Seçin',
+                  value: _selectedModel,
+                  items: _models.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                  onChanged: _selectedSeries == null ? null : (model) {
+                    setState(() => _selectedModel = model);
+                  },
+                  hint: _selectedSeries == null ? 'Önce seri seçin' : 'Model seçin',
+                ),
+                const Spacer(),
                 SizedBox(
                   width: double.infinity,
+                  height: 56,
                   child: ElevatedButton(
-                    onPressed: (_selectedBrand != null && _selectedModel != null)
+                    onPressed: (_selectedBrand != null && _selectedSeries != null && _selectedModel != null)
                         ? () {
-                      Navigator.of(context).pop({'brand': _selectedBrand, 'model': _selectedModel});
-                    }
-                        : null, // Disable button if brand or model not selected
+                            Navigator.of(context).pop({
+                              'brand': _selectedBrand!.name,
+                              'series': _selectedSeries!.series,
+                              'model': _selectedModel
+                            });
+                          }
+                        : null,
                     style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.textPrimary,
-                      textStyle: AppTextStyles.button,
+                      foregroundColor: Colors.black,
                     ),
-                    child: const Text('Uygula ve Filtrele'),
+                    child: const Text('UYGULA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                 ),
               ],
@@ -147,6 +128,42 @@ class _BrandModelSelectionPageState extends State<BrandModelSelectionPage> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildDropdown<T>({
+    required String label,
+    required T? value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?>? onChanged,
+    required String hint,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: AppColors.textHint, fontSize: 12, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<T>(
+              value: value,
+              items: items,
+              onChanged: onChanged,
+              isExpanded: true,
+              dropdownColor: AppColors.surface,
+              icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary),
+              hint: Text(hint, style: TextStyle(color: AppColors.textHint.withOpacity(0.5))),
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

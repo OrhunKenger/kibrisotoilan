@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../core/network/dio_error_handler.dart';
 import '../../domain/entities/car_enums.dart';
 import '../models/car_model.dart';
+import '../models/brand_model.dart';
 import 'dart:typed_data';
 
 // region Enum to String Mappers for API
@@ -50,6 +51,8 @@ abstract class CarRemoteDataSource {
     String? city,
     int? minMileage,
     int? maxMileage,
+    int? minYear,
+    int? maxYear,
     int? engineSize,
     BodyType? bodyType,
     TransmissionType? transmission,
@@ -66,6 +69,8 @@ abstract class CarRemoteDataSource {
   Future<void> removeFavorite(int id);
   Future<List<CarModel>> getMyFavorites({required int page, required int limit});
   Future<List<String>> getUniqueBrands();
+  Future<List<BrandModel>> getAllBrands();
+  Future<List<Map<String, dynamic>>> getSeriesAndModels(int brandId);
   Future<List<String>> getModelsByBrand(String brand);
 }
 
@@ -85,6 +90,8 @@ class CarRemoteDataSourceImpl implements CarRemoteDataSource {
     String? city,
     int? minMileage,
     int? maxMileage,
+    int? minYear,
+    int? maxYear,
     int? engineSize,
     BodyType? bodyType,
     TransmissionType? transmission,
@@ -108,6 +115,8 @@ class CarRemoteDataSourceImpl implements CarRemoteDataSource {
       if (city != null) 'city': city,
       if (minMileage != null) 'min_mileage': minMileage,
       if (maxMileage != null) 'max_mileage': maxMileage,
+      if (minYear != null) 'min_year': minYear,
+      if (maxYear != null) 'max_year': maxYear,
       if (engineSize != null) 'engine_size': engineSize,
       if (bodyType != null) 'body_type': _bodyTypeToString[bodyType],
       if (transmission != null) 'transmission': _transmissionTypeToString[transmission],
@@ -227,6 +236,27 @@ class CarRemoteDataSourceImpl implements CarRemoteDataSource {
         queryParameters: {'page': 1, 'size': 50},
       );
       return (response.data as List).map((e) => e.toString()).toList();
+    } on DioException catch (e) {
+      _handleDioException(e);
+    }
+  }
+
+  @override
+  Future<List<BrandModel>> getAllBrands() async {
+    try {
+      final response = await dio.get('/brands');
+      final List<dynamic> brandsData = response.data['brands'];
+      return brandsData.map((e) => BrandModel.fromJson(e)).toList();
+    } on DioException catch (e) {
+      _handleDioException(e);
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getSeriesAndModels(int brandId) async {
+    try {
+      final response = await dio.get('/brands/$brandId/models');
+      return (response.data as List).map((e) => e as Map<String, dynamic>).toList();
     } on DioException catch (e) {
       _handleDioException(e);
     }

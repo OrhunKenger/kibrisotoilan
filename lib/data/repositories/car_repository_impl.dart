@@ -3,8 +3,10 @@ import 'package:dartz/dartz.dart';
 import '../../core/errors/exceptions.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/entities/car_entity.dart';
+import '../../domain/entities/brand_entity.dart';
 import '../../domain/entities/car_enums.dart';
 import '../../domain/repositories/car_repository.dart';
+import '../../presentation/bloc/car/car_state.dart'; // For SeriesModels
 import '../datasources/car_remote_data_source.dart';
 import '../models/car_model.dart';
 
@@ -24,6 +26,8 @@ class CarRepositoryImpl implements CarRepository {
     String? city,
     int? minMileage,
     int? maxMileage,
+    int? minYear,
+    int? maxYear,
     int? engineSize,
     BodyType? bodyType,
     TransmissionType? transmission,
@@ -44,6 +48,8 @@ class CarRepositoryImpl implements CarRepository {
         city: city,
         minMileage: minMileage,
         maxMileage: maxMileage,
+        minYear: minYear,
+        maxYear: maxYear,
         engineSize: engineSize,
         bodyType: bodyType,
         transmission: transmission,
@@ -173,6 +179,39 @@ class CarRepositoryImpl implements CarRepository {
     try {
       final brands = await remoteDataSource.getUniqueBrands();
       return Right(brands);
+    } on UnauthorizedException {
+      return Left(UnauthorizedFailure());
+    } on NetworkException catch (e) {
+      return Left(ConnectionFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message ?? 'Sunucu hatası'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<BrandEntity>>> getAllBrands() async {
+    try {
+      final brands = await remoteDataSource.getAllBrands();
+      return Right(brands);
+    } on UnauthorizedException {
+      return Left(UnauthorizedFailure());
+    } on NetworkException catch (e) {
+      return Left(ConnectionFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message ?? 'Sunucu hatası'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<SeriesModels>>> getSeriesAndModels(int brandId) async {
+    try {
+      final data = await remoteDataSource.getSeriesAndModels(brandId);
+      final list = data.map((e) => SeriesModels(
+        id: e['id'],
+        series: e['series'],
+        models: List<String>.from(e['models']),
+      )).toList();
+      return Right(list);
     } on UnauthorizedException {
       return Left(UnauthorizedFailure());
     } on NetworkException catch (e) {

@@ -7,6 +7,8 @@ import '../../../domain/usecases/add_favorite_usecase.dart';
 import '../../../domain/usecases/remove_favorite_usecase.dart';
 import '../../../domain/usecases/get_my_favorites_usecase.dart';
 import '../../../domain/usecases/get_unique_brands_usecase.dart';
+import '../../../domain/usecases/get_all_brands_usecase.dart';
+import '../../../domain/usecases/get_series_and_models_usecase.dart';
 import '../../../domain/usecases/get_models_by_brand_usecase.dart';
 import '../../../domain/entities/car_entity.dart'; // Eklendi
 
@@ -21,6 +23,8 @@ class CarBloc extends Bloc<CarEvent, CarState> {
   final RemoveFavorite removeFavoriteUseCase;
   final GetMyFavorites getMyFavoritesUseCase;
   final GetUniqueBrands getUniqueBrandsUseCase;
+  final GetAllBrands getAllBrandsUseCase;
+  final GetSeriesAndModels getSeriesAndModelsUseCase;
   final GetModelsByBrand getModelsByBrandUseCase;
 
   // Hafızada tutulan son araç listesi
@@ -34,6 +38,8 @@ class CarBloc extends Bloc<CarEvent, CarState> {
     required this.removeFavoriteUseCase,
     required this.getMyFavoritesUseCase,
     required this.getUniqueBrandsUseCase,
+    required this.getAllBrandsUseCase,
+    required this.getSeriesAndModelsUseCase,
     required this.getModelsByBrandUseCase,
   }) : super(const CarInitial()) {
     on<GetCarsEvent>(_onGetCars);
@@ -43,6 +49,8 @@ class CarBloc extends Bloc<CarEvent, CarState> {
     on<RemoveFavoriteEvent>(_onRemoveFavorite);
     on<GetMyFavoritesEvent>(_onGetMyFavorites);
     on<GetUniqueBrandsEvent>(_onGetUniqueBrands);
+    on<GetAllBrandsEvent>(_onGetAllBrands);
+    on<GetSeriesAndModelsEvent>(_onGetSeriesAndModels);
     on<GetModelsByBrandEvent>(_onGetModelsByBrand);
   }
 
@@ -58,7 +66,9 @@ class CarBloc extends Bloc<CarEvent, CarState> {
     final result = await getCarsUseCase(GetCarsParams(
       brand: event.brand, model: event.model, minPrice: event.minPrice, maxPrice: event.maxPrice,
       currency: event.currency, steering: event.steering, city: event.city,
-      minMileage: event.minMileage, maxMileage: event.maxMileage, engineSize: event.engineSize,
+      minMileage: event.minMileage, maxMileage: event.maxMileage,
+      minYear: event.minYear, maxYear: event.maxYear,
+      engineSize: event.engineSize,
       bodyType: event.bodyType, transmission: event.transmission, color: event.color,
       page: event.page, limit: event.limit, sortBy: event.sortBy, sortOrder: event.sortOrder,
     ));
@@ -93,6 +103,16 @@ class CarBloc extends Bloc<CarEvent, CarState> {
   Future<void> _onGetUniqueBrands(GetUniqueBrandsEvent event, Emitter<CarState> emit) async {
     final result = await getUniqueBrandsUseCase();
     result.fold((f) => emit(CarError(message: _failureMessage(f))), (b) => emit(CarBrandsLoaded(brands: b)));
+  }
+
+  Future<void> _onGetAllBrands(GetAllBrandsEvent event, Emitter<CarState> emit) async {
+    final result = await getAllBrandsUseCase();
+    result.fold((f) => emit(CarError(message: _failureMessage(f))), (b) => emit(AllBrandsLoaded(brands: b)));
+  }
+
+  Future<void> _onGetSeriesAndModels(GetSeriesAndModelsEvent event, Emitter<CarState> emit) async {
+    final result = await getSeriesAndModelsUseCase(event.brandId);
+    result.fold((f) => emit(CarError(message: _failureMessage(f))), (sm) => emit(SeriesAndModelsLoaded(seriesModels: sm)));
   }
 
   Future<void> _onGetModelsByBrand(GetModelsByBrandEvent event, Emitter<CarState> emit) async {

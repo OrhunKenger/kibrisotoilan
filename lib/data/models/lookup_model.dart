@@ -64,6 +64,7 @@ class LookupsData {
   final List<LookupItem> steeringTypes;
   final List<LookupItem> currencies;
   final List<LookupItem> mileageUnits;
+  final List<LookupItem> colors;
 
   const LookupsData({
     this.cities = const [],
@@ -73,6 +74,7 @@ class LookupsData {
     this.steeringTypes = const [],
     this.currencies = const [],
     this.mileageUnits = const [],
+    this.colors = const [],
   });
 
   factory LookupsData.fromJson(Map<String, dynamic> json) {
@@ -87,6 +89,7 @@ class LookupsData {
       steeringTypes: _parseItems(json['steering_types']),
       currencies: _parseItems(json['currencies']),
       mileageUnits: _parseItems(json['mileage_units']),
+      colors: _parseItems(json['colors']),
     );
   }
 

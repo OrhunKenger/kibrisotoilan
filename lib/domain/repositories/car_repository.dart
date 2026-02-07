@@ -1,7 +1,9 @@
 import 'package:dartz/dartz.dart';
 import '../../core/errors/failures.dart';
 import '../entities/car_entity.dart';
+import '../entities/brand_entity.dart';
 import '../entities/car_enums.dart';
+import '../../presentation/bloc/car/car_state.dart'; // For SeriesModels
 
 abstract class CarRepository {
   Future<Either<Failure, List<CarEntity>>> getCars({
@@ -14,6 +16,8 @@ abstract class CarRepository {
     String? city,
     int? minMileage,
     int? maxMileage,
+    int? minYear,
+    int? maxYear,
     int? engineSize,
     BodyType? bodyType,
     TransmissionType? transmission,
@@ -38,5 +42,7 @@ abstract class CarRepository {
   });
 
   Future<Either<Failure, List<String>>> getUniqueBrands();
+  Future<Either<Failure, List<BrandEntity>>> getAllBrands();
+  Future<Either<Failure, List<SeriesModels>>> getSeriesAndModels(int brandId);
   Future<Either<Failure, List<String>>> getModelsByBrand(String brand);
 }

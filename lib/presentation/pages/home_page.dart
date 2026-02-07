@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/theme/app_colors.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import '../../domain/entities/brand_entity.dart';
 import '../bloc/auth/auth_bloc.dart';
 import '../bloc/auth/auth_state.dart';
 import '../bloc/car/car_bloc.dart';
 import '../bloc/car/car_event.dart';
 import '../bloc/car/car_state.dart';
 import '../widgets/home/car_card.dart';
+import '../widgets/home/filter_bottom_sheet.dart';
+import '../widgets/tools/devir_hesapla_sheet.dart';
 import 'car_detail_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -17,7 +21,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  BrandEntity? _selectedBrandEntity;
   String? _selectedBrand;
+  String? _selectedModel;
+  List<SeriesModels> _currentSeriesList = [];
 
   @override
   void initState() {
@@ -29,14 +36,67 @@ class _HomePageState extends State<HomePage> {
     final carBloc = context.read<CarBloc>();
     if (carBloc.state is CarInitial || carBloc.state is CarError) {
       _fetchCars();
+      carBloc.add(const GetAllBrandsEvent());
     }
+  }
+
+  void _onBrandTap(BrandEntity brand) {
+    if (_selectedBrand == brand.name) {
+      _resetBrandFilter();
+    } else {
+      setState(() {
+        _selectedBrandEntity = brand;
+        _selectedBrand = brand.name;
+        _selectedModel = null;
+        _currentSeriesList = [];
+      });
+      context.read<CarBloc>().add(GetSeriesAndModelsEvent(brandId: brand.id));
+      _fetchCars(brand: brand.name);
+    }
+  }
+
+  void _resetBrandFilter() {
+    setState(() {
+      _selectedBrandEntity = null;
+      _selectedBrand = null;
+      _selectedModel = null;
+      _currentSeriesList = [];
+    });
+    _fetchCars(brand: null);
+  }
+
+  void _onSeriesTap(String seriesName) {
+    setState(() {
+      _selectedModel = seriesName;
+    });
+    _fetchCarsWithSeries(_selectedBrand!, seriesName);
+  }
+
+  void _fetchCarsWithSeries(String brand, String series) {
+    if (!mounted) return;
+    setState(() {
+      _selectedBrand = brand;
+      _selectedModel = series;
+    });
+    context.read<CarBloc>().add(GetCarsEvent(
+      brand: brand,
+      model: series,
+      page: 1,
+      limit: 20,
+      sortBy: 'created_at',
+      sortOrder: 'desc',
+    ));
   }
 
   void _fetchCars({String? brand}) {
     if (!mounted) return;
-    setState(() => _selectedBrand = brand);
+    setState(() {
+      _selectedBrand = brand;
+      if (brand == null) _selectedModel = null;
+    });
     context.read<CarBloc>().add(GetCarsEvent(
       brand: brand,
+      model: _selectedModel,
       page: 1,
       limit: 20,
       sortBy: 'created_at',
@@ -65,10 +125,11 @@ class _HomePageState extends State<HomePage> {
             slivers: [
               _buildSliverAppBar(),
               SliverToBoxAdapter(child: _buildSearchBar()),
+              SliverToBoxAdapter(child: _buildQuickTools()),
               SliverToBoxAdapter(
                 child: _buildSectionHeader(
                   title: 'Popüler Markalar', 
-                  onSeeAll: () => _fetchCars(brand: null)
+                  onSeeAll: () => _resetBrandFilter()
                 )
               ),
               SliverToBoxAdapter(child: _buildBrandList()),
@@ -130,7 +191,17 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {},
+          onTap: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => FilterBottomSheet(
+                initialBrand: _selectedBrand,
+                initialModel: _selectedModel,
+              ),
+            );
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
@@ -156,6 +227,81 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildQuickTools() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Text('Hızlı Araçlar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          ),
+          SizedBox(
+            height: 50,
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              children: [
+                _buildToolButton(
+                  icon: Icons.calculate_outlined,
+                  label: 'Devir Hesapla',
+                  onTap: () => _showDevirHesaplaOptions(),
+                ),
+                const SizedBox(width: 12),
+                _buildToolButton(
+                  icon: Icons.history_edu_outlined,
+                  label: 'Hasar Sorgula',
+                  onTap: () {},
+                ),
+                const SizedBox(width: 12),
+                _buildToolButton(
+                  icon: Icons.gavel_outlined,
+                  label: 'Gümrük Harcı',
+                  onTap: () {},
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToolButton({required IconData icon, required String label, required VoidCallback onTap}) {
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withOpacity(0.05)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(label, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 13)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDevirHesaplaOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const DevirHesaplaOptionsSheet(),
+    );
+  }
+
   Widget _buildSectionHeader({required String title, required VoidCallback onSeeAll}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
@@ -173,15 +319,74 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildBrandList() {
-    final brands = [
-      {'name': 'BMW', 'icon': Icons.directions_car},
-      {'name': 'Mercedes', 'icon': Icons.stars},
-      {'name': 'Audi', 'icon': Icons.incomplete_circle},
-      {'name': 'Toyota', 'icon': Icons.airport_shuttle},
-      {'name': 'Honda', 'icon': Icons.local_taxi},
-      {'name': 'Ford', 'icon': Icons.commute},
-    ];
+    return BlocListener<CarBloc, CarState>(
+      listener: (context, state) {
+        if (state is SeriesAndModelsLoaded) {
+          setState(() => _currentSeriesList = state.seriesModels);
+        }
+      },
+      child: BlocBuilder<CarBloc, CarState>(
+        buildWhen: (previous, current) => current is AllBrandsLoaded,
+        builder: (context, state) {
+          List<BrandEntity> brands = [];
+          if (state is AllBrandsLoaded) {
+            brands = state.brands;
+          }
+
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.1, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: _buildAnimatedContent(brands),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAnimatedContent(List<BrandEntity> brands) {
+    if (_selectedBrandEntity != null) {
+      // Focused View: Selected Brand + Series
+      return SizedBox(
+        key: const ValueKey('focused_view'),
+        height: 100,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          children: [
+            _buildBrandItem(_selectedBrandEntity!, isSelected: true, onTap: () => _resetBrandFilter()),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 15),
+              width: 1, height: 40, color: Colors.white10,
+            ),
+            ..._currentSeriesList.map((s) => _buildSeriesItem(s.series, isSelected: _selectedModel == s.series)),
+          ],
+        ),
+      );
+    }
+
+    if (brands.isEmpty) {
+      return const SizedBox(
+        key: ValueKey('loading_view'),
+        height: 100,
+        child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
+    // Default view: All brands
     return SizedBox(
+      key: const ValueKey('all_brands_view'),
       height: 100,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -189,37 +394,92 @@ class _HomePageState extends State<HomePage> {
         physics: const BouncingScrollPhysics(),
         itemCount: brands.length,
         separatorBuilder: (_, __) => const SizedBox(width: 15),
-        itemBuilder: (context, index) {
-          final brand = brands[index];
-          final isSelected = _selectedBrand == brand['name'];
-          return Column(
-            children: [
-              InkWell(
-                onTap: () => _fetchCars(brand: brand['name'] as String),
-                borderRadius: BorderRadius.circular(30),
-                child: Container(
-                  width: 60, height: 60,
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : AppColors.surface, 
-                    shape: BoxShape.circle, 
-                    border: Border.all(color: isSelected ? AppColors.primary : Colors.white10),
-                  ),
-                  child: Icon(brand['icon'] as IconData, color: isSelected ? Colors.black : AppColors.textPrimary, size: 30),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(brand['name'] as String, style: TextStyle(color: isSelected ? AppColors.primary : AppColors.textHint, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500)),
-            ],
-          );
-        },
+        itemBuilder: (context, index) => _buildBrandItem(brands[index], isSelected: false, onTap: () => _onBrandTap(brands[index])),
       ),
     );
   }
 
+  Widget _buildBrandItem(BrandEntity brand, {required bool isSelected, required VoidCallback onTap}) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(30),
+          child: Container(
+            width: 60, height: 60,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isSelected ? AppColors.primary : Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: isSelected ? AppColors.primary : Colors.white10, width: 2),
+            ),
+            child: brand.logoUrl != null
+                ? CachedNetworkImage(
+                    imageUrl: brand.logoUrl!,
+                    errorWidget: (context, url, error) => Icon(_getBrandIcon(brand.name), color: Colors.black54, size: 30),
+                    fit: BoxFit.contain,
+                  )
+                : Icon(_getBrandIcon(brand.name), color: Colors.black, size: 30),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(brand.name, style: TextStyle(color: isSelected ? AppColors.primary : AppColors.textHint, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500)),
+      ],
+    );
+  }
+
+  Widget _buildSeriesItem(String name, {required bool isSelected}) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 15),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => _onSeriesTap(name),
+            borderRadius: BorderRadius.circular(30),
+            child: Container(
+              width: 60, height: 60,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primary : AppColors.surface,
+                shape: BoxShape.circle,
+                border: Border.all(color: isSelected ? AppColors.primary : Colors.white10, width: 1),
+              ),
+              child: Center(
+                child: Text(
+                  name,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  style: TextStyle(
+                    color: isSelected ? Colors.black : AppColors.textPrimary,
+                    fontSize: name.length > 8 ? 9 : 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text('Seri', style: TextStyle(color: Colors.transparent, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  IconData _getBrandIcon(String brandName) {
+    switch (brandName.toLowerCase()) {
+      case 'bmw': return Icons.directions_car;
+      case 'mercedes-benz': return Icons.stars;
+      case 'audi': return Icons.incomplete_circle;
+      case 'toyota': return Icons.airport_shuttle;
+      case 'honda': return Icons.local_taxi;
+      case 'ford': return Icons.commute;
+      case 'tesla': return Icons.electric_car;
+      default: return Icons.directions_car_filled_outlined;
+    }
+  }
+
   Widget _buildCarGrid() {
     return BlocBuilder<CarBloc, CarState>(
-      // NOKTA ATIŞI: Sadece bu durumlar oluştuğunda UI'ı baştan çiz. 
-      // Detay yüklendiğinde veya favori değiştiğinde gridi bozma.
       buildWhen: (previous, current) => 
           current is CarsLoaded || current is CarLoading || current is CarInitial || current is CarError,
       builder: (context, state) {
@@ -262,7 +522,7 @@ class _HomePageState extends State<HomePage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => CarDetailPage(car: car)),
-                      ); // .then(..) kısmını kaldırdım, çünkü CarBloc artık listeyi otomatik güncelliyor.
+                      );
                     },
                   );
                 },

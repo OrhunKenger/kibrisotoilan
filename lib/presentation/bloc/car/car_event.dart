@@ -19,6 +19,8 @@ class GetCarsEvent extends CarEvent {
   final String? city;
   final int? minMileage;
   final int? maxMileage;
+  final int? minYear;
+  final int? maxYear;
   final int? engineSize;
   final BodyType? bodyType;
   final TransmissionType? transmission;
@@ -38,6 +40,8 @@ class GetCarsEvent extends CarEvent {
     this.city,
     this.minMileage,
     this.maxMileage,
+    this.minYear,
+    this.maxYear,
     this.engineSize,
     this.bodyType,
     this.transmission,
@@ -51,7 +55,7 @@ class GetCarsEvent extends CarEvent {
   @override
   List<Object?> get props => [
     brand, model, minPrice, maxPrice, currency, steering, city,
-    minMileage, maxMileage, engineSize, bodyType, transmission,
+    minMileage, maxMileage, minYear, maxYear, engineSize, bodyType, transmission,
     color, page, limit, sortBy, sortOrder
   ];
 }
@@ -106,6 +110,10 @@ class GetUniqueBrandsEvent extends CarEvent {
   const GetUniqueBrandsEvent();
 }
 
+class GetAllBrandsEvent extends CarEvent {
+  const GetAllBrandsEvent();
+}
+
 class GetModelsByBrandEvent extends CarEvent {
   final String brand;
 
@@ -113,4 +121,13 @@ class GetModelsByBrandEvent extends CarEvent {
 
   @override
   List<Object?> get props => [brand];
+}
+
+class GetSeriesAndModelsEvent extends CarEvent {
+  final int brandId;
+
+  const GetSeriesAndModelsEvent({required this.brandId});
+
+  @override
+  List<Object?> get props => [brandId];
 }

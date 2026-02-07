@@ -93,4 +93,12 @@ class LookupService {
     }
     return map;
   }
+
+  Map<String, String> get colorValueToLabel {
+    final map = <String, String>{};
+    for (final c in data.colors) {
+      map[c.value] = c.labelTr;
+    }
+    return map;
+  }
 }

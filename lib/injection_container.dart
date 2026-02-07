@@ -37,6 +37,8 @@ import 'domain/usecases/update_user_profile_usecase.dart';
 import 'domain/usecases/get_my_listings_usecase.dart';
 import 'domain/usecases/soft_delete_user.dart'; // New Import
 import 'domain/usecases/get_unique_brands_usecase.dart'; // Yeni
+import 'domain/usecases/get_all_brands_usecase.dart'; // Yeni
+import 'domain/usecases/get_series_and_models_usecase.dart'; // Yeni
 import 'domain/usecases/get_models_by_brand_usecase.dart'; // Yeni
 
 // Blocs
@@ -142,6 +144,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetMyListings(sl()));
   sl.registerLazySingleton(() => SoftDeleteUser(sl())); // New
   sl.registerLazySingleton(() => GetUniqueBrands(sl())); // Yeni
+  sl.registerLazySingleton(() => GetAllBrands(sl())); // Yeni
+  sl.registerLazySingleton(() => GetSeriesAndModels(sl())); // Yeni
   sl.registerLazySingleton(() => GetModelsByBrand(sl())); // Yeni
 
   // Blocs
@@ -153,6 +157,8 @@ Future<void> init() async {
         removeFavoriteUseCase: sl(),
         getMyFavoritesUseCase: sl(),
         getUniqueBrandsUseCase: sl(), // Yeni
+        getAllBrandsUseCase: sl(), // Yeni
+        getSeriesAndModelsUseCase: sl(), // Yeni
         getModelsByBrandUseCase: sl(), // Yeni
       ));
   sl.registerFactory(() => AuthBloc(authRepository: sl()));

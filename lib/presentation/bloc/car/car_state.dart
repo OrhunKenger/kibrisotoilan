@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../../domain/entities/car_entity.dart';
+import '../../../domain/entities/brand_entity.dart';
 
 abstract class CarState extends Equatable {
   const CarState();
@@ -107,6 +108,33 @@ class CarBrandsLoaded extends CarState {
 
   @override
   List<Object?> get props => [brands];
+}
+
+class AllBrandsLoaded extends CarState {
+  final List<BrandEntity> brands;
+  const AllBrandsLoaded({required this.brands});
+
+  @override
+  List<Object?> get props => [brands];
+}
+
+class SeriesModels extends Equatable {
+  final int id;
+  final String series;
+  final List<String> models;
+
+  const SeriesModels({required this.id, required this.series, required this.models});
+
+  @override
+  List<Object?> get props => [id, series, models];
+}
+
+class SeriesAndModelsLoaded extends CarState {
+  final List<SeriesModels> seriesModels;
+  const SeriesAndModelsLoaded({required this.seriesModels});
+
+  @override
+  List<Object?> get props => [seriesModels];
 }
 
 class CarModelsLoaded extends CarState {
