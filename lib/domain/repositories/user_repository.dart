@@ -7,4 +7,5 @@ abstract class UserRepository {
   Future<Either<Failure, UserEntity>> getUserProfile();
   Future<Either<Failure, UserEntity>> updateUserProfile(Map<String, dynamic> data);
   Future<Either<Failure, List<CarEntity>>> getMyListings({required int page, required int limit});
+  Future<Either<Failure, void>> deleteUser();
 }

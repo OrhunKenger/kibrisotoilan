@@ -6,9 +6,12 @@ import 'core/theme/app_theme.dart';
 import 'injection_container.dart' as di;
 import 'core/services/lookup_service.dart';
 
-import 'presentation/bloc/auth/auth_bloc.dart';
-import 'presentation/bloc/auth/auth_event.dart';
-import 'presentation/bloc/auth/auth_state.dart';
+import 'presentation/bloc/auth/auth_bloc.dart'; // RE-ADDED IMPORT
+import 'presentation/bloc/auth/auth_event.dart'; // RE-ADDED IMPORT
+import 'presentation/bloc/auth/auth_state.dart'; // RE-ADDED IMPORT
+import 'presentation/bloc/car/car_bloc.dart';
+import 'presentation/bloc/car/car_event.dart';
+import 'presentation/bloc/car/car_state.dart';
 import 'presentation/pages/splash_page.dart';
 import 'presentation/pages/main_wrapper.dart';
 import 'presentation/pages/user_type_selection_page.dart';
@@ -26,7 +29,15 @@ Future<void> main() async {
   };
 
   await di.init();
-  await di.sl<LookupService>().loadLookups();
+  
+  // Lookup servislerini güvenli bir şekilde yükle
+  // Backend kapalı olsa bile uygulama açılmalı
+  try {
+    await di.sl<LookupService>().loadLookups();
+  } catch (e) {
+    debugPrint('LookupService yüklenirken hata oluştu: $e');
+    // İleride burada bir "Retry" mekanizması veya UI'da uyarı gösterilebilir
+  }
 
   final authBloc = di.sl<AuthBloc>()..add(const AppStarted());
 
@@ -36,8 +47,15 @@ Future<void> main() async {
   });
 
   runApp(
-    BlocProvider<AuthBloc>(
-      create: (context) => authBloc,
+    MultiBlocProvider(
+      providers: [
+        BlocProvider<AuthBloc>(
+          create: (context) => authBloc,
+        ),
+        BlocProvider<CarBloc>(
+          create: (context) => di.sl<CarBloc>(),
+        ),
+      ],
       child: const MyApp(),
     ),
   );

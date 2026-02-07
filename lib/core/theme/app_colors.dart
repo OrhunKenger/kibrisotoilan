@@ -23,6 +23,7 @@ class AppColors {
   static const Color error = Colors.redAccent;
   static const Color success = Colors.green;
   static const Color warning = Colors.orange;
+  static const Color info = Colors.blue; // New
 
   // Misc
   static const Color divider = Color(0xFF424242);

@@ -101,3 +101,16 @@ class GetMyFavoritesEvent extends CarEvent {
   @override
   List<Object?> get props => [page, limit];
 }
+
+class GetUniqueBrandsEvent extends CarEvent {
+  const GetUniqueBrandsEvent();
+}
+
+class GetModelsByBrandEvent extends CarEvent {
+  final String brand;
+
+  const GetModelsByBrandEvent({required this.brand});
+
+  @override
+  List<Object?> get props => [brand];
+}

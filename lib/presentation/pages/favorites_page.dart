@@ -96,7 +96,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
                         MaterialPageRoute(
                           builder: (_) => BlocProvider.value(
                             value: context.read<CarBloc>(),
-                            child: CarDetailPage(carId: car.id!),
+                            child: CarDetailPage(car: car),
                           ),
                         ),
                       );

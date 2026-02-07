@@ -1,19 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../core/constants/cyprus_cities.dart';
-import '../../core/constants/enum_labels.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
-import '../../core/theme/app_decorations.dart';
-import '../../domain/entities/car_enums.dart';
+import '../bloc/auth/auth_bloc.dart';
+import '../bloc/auth/auth_state.dart';
 import '../bloc/car/car_bloc.dart';
 import '../bloc/car/car_event.dart';
 import '../bloc/car/car_state.dart';
-import '../widgets/car_list_card.dart';
-import '../widgets/empty_state_widget.dart';
-import '../widgets/error_state_widget.dart';
+import '../widgets/home/car_card.dart';
 import 'car_detail_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -24,362 +17,262 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final TextEditingController _brandController = TextEditingController();
-  final TextEditingController _modelController = TextEditingController();
-  final TextEditingController _minPriceController = TextEditingController();
-  final TextEditingController _maxPriceController = TextEditingController();
-  final TextEditingController _minMileageController = TextEditingController();
-  final TextEditingController _maxMileageController = TextEditingController();
-  final TextEditingController _engineSizeController = TextEditingController();
-  final TextEditingController _colorController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-
-  Timer? _debounce;
-  Currency? _selectedCurrency;
-  SteeringType? _selectedSteering;
-  BodyType? _selectedBodyType;
-  TransmissionType? _selectedTransmission;
-  String? _selectedCity;
-
-  bool _isFilterExpanded = false;
+  String? _selectedBrand;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
-    _brandController.addListener(_onSearchChanged);
-    _modelController.addListener(_onSearchChanged);
-    _loadCars();
+    _checkAndFetch();
   }
 
-  void _onSearchChanged() {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      _applyFilters();
-    });
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      _loadMoreCars();
+  void _checkAndFetch() {
+    final carBloc = context.read<CarBloc>();
+    if (carBloc.state is CarInitial || carBloc.state is CarError) {
+      _fetchCars();
     }
   }
 
-  void _loadMoreCars() {
-    final state = context.read<CarBloc>().state;
-    if (state is CarsLoaded && !state.hasReachedMax) {
-      _loadCars(
-        brand: _brandController.text.isEmpty ? null : _brandController.text,
-        model: _modelController.text.isEmpty ? null : _modelController.text,
-        minPrice: double.tryParse(_minPriceController.text),
-        maxPrice: double.tryParse(_maxPriceController.text),
-        currency: _selectedCurrency,
-        steering: _selectedSteering,
-        city: _selectedCity,
-        minMileage: int.tryParse(_minMileageController.text),
-        maxMileage: int.tryParse(_maxMileageController.text),
-        engineSize: int.tryParse(_engineSizeController.text),
-        bodyType: _selectedBodyType,
-        transmission: _selectedTransmission,
-        color: _colorController.text.isEmpty ? null : _colorController.text,
-        page: state.currentPage + 1,
-      );
-    }
-  }
-
-  void _loadCars({
-    String? brand,
-    String? model,
-    double? minPrice,
-    double? maxPrice,
-    Currency? currency,
-    SteeringType? steering,
-    String? city,
-    int? minMileage,
-    int? maxMileage,
-    int? engineSize,
-    BodyType? bodyType,
-    TransmissionType? transmission,
-    String? color,
-    int page = 1,
-    int limit = 10,
-    String sortBy = "created_at",
-    String sortOrder = "desc",
-  }) {
-    context.read<CarBloc>().add(
-      GetCarsEvent(
-        brand: brand, model: model,
-        minPrice: minPrice, maxPrice: maxPrice,
-        currency: currency, steering: steering,
-        city: city,
-        minMileage: minMileage, maxMileage: maxMileage,
-        engineSize: engineSize, bodyType: bodyType,
-        transmission: transmission, color: color,
-        page: page, limit: limit,
-        sortBy: sortBy, sortOrder: sortOrder,
-      ),
-    );
-  }
-
-  void _applyFilters() {
-    _loadCars(
-      brand: _brandController.text.isEmpty ? null : _brandController.text,
-      model: _modelController.text.isEmpty ? null : _modelController.text,
-      minPrice: double.tryParse(_minPriceController.text),
-      maxPrice: double.tryParse(_maxPriceController.text),
-      currency: _selectedCurrency,
-      steering: _selectedSteering,
-      city: _selectedCity,
-      minMileage: int.tryParse(_minMileageController.text),
-      maxMileage: int.tryParse(_maxMileageController.text),
-      engineSize: int.tryParse(_engineSizeController.text),
-      bodyType: _selectedBodyType,
-      transmission: _selectedTransmission,
-      color: _colorController.text.isEmpty ? null : _colorController.text,
-    );
-  }
-
-  void _resetFilters() {
-    _brandController.clear();
-    _modelController.clear();
-    _minPriceController.clear();
-    _maxPriceController.clear();
-    _minMileageController.clear();
-    _maxMileageController.clear();
-    _engineSizeController.clear();
-    _colorController.clear();
-    setState(() {
-      _selectedCurrency = null;
-      _selectedSteering = null;
-      _selectedBodyType = null;
-      _selectedTransmission = null;
-      _selectedCity = null;
-    });
-    _loadCars();
+  void _fetchCars({String? brand}) {
+    if (!mounted) return;
+    setState(() => _selectedBrand = brand);
+    context.read<CarBloc>().add(GetCarsEvent(
+      brand: brand,
+      page: 1,
+      limit: 20,
+      sortBy: 'created_at',
+      sortOrder: 'desc',
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('İlanlar')),
-      body: Column(
-        children: [
-          _buildFilterSection(),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async => _loadCars(),
-              color: AppColors.primary,
-              child: BlocBuilder<CarBloc, CarState>(
-                buildWhen: (_, current) =>
-                    current is CarLoading ||
-                    current is CarsLoaded ||
-                    current is CarError ||
-                    current is CarInitial,
-                builder: (context, state) {
-                  if (state is CarLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (state is CarsLoaded) {
-                    if (state.cars.isEmpty) {
-                      return ListView(
-                        children: [
-                          SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.5,
-                            child: const EmptyStateWidget(
-                              icon: Icons.directions_car_filled,
-                              title: 'Henüz ilan yok',
-                              subtitle: 'İlk ilanı sen ekle!',
-                            ),
-                          ),
-                        ],
-                      );
-                    }
-                    return ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.only(bottom: 16),
-                      itemCount: state.cars.length + (state.hasReachedMax ? 0 : 1),
-                      itemBuilder: (context, index) {
-                        if (index >= state.cars.length) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-                        final car = state.cars[index];
-                        return CarListCard(
-                          car: car,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => BlocProvider.value(
-                                  value: context.read<CarBloc>(),
-                                  child: CarDetailPage(carId: car.id!),
-                                ),
-                              ),
-                            );
-                          },
-                          onFavorite: () {
-                            context.read<CarBloc>().add(
-                              AddFavoriteEvent(carId: car.id!),
-                            );
-                          },
-                        );
-                      },
-                    );
-                  } else if (state is CarError) {
-                    return ErrorStateWidget(
-                      message: state.message,
-                      onRetry: () => _loadCars(),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is Authenticated) {
+          _fetchCars(brand: _selectedBrand);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: RefreshIndicator(
+          onRefresh: () async {
+            _fetchCars(brand: _selectedBrand);
+          },
+          color: AppColors.primary,
+          backgroundColor: AppColors.surface,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            slivers: [
+              _buildSliverAppBar(),
+              SliverToBoxAdapter(child: _buildSearchBar()),
+              SliverToBoxAdapter(
+                child: _buildSectionHeader(
+                  title: 'Popüler Markalar', 
+                  onSeeAll: () => _fetchCars(brand: null)
+                )
               ),
-            ),
+              SliverToBoxAdapter(child: _buildBrandList()),
+              SliverToBoxAdapter(
+                child: _buildSectionHeader(
+                  title: _selectedBrand == null ? 'Son Eklenen İlanlar' : '$_selectedBrand İlanları', 
+                  onSeeAll: () {}
+                )
+              ),
+              _buildCarGrid(),
+              const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildFilterSection() {
-    return ExpansionTile(
-      initiallyExpanded: _isFilterExpanded,
-      onExpansionChanged: (expanded) => setState(() => _isFilterExpanded = expanded),
-      title: Text('Detaylı Filtreleme', style: AppTextStyles.subtitle),
-      leading: Icon(
-        _isFilterExpanded ? Icons.filter_list_off : Icons.filter_list,
-        color: AppColors.textPrimary,
-      ),
-      children: [
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.55,
-          ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
+  Widget _buildSliverAppBar() {
+    return SliverAppBar(
+      expandedHeight: 80.0,
+      floating: true,
+      pinned: false,
+      backgroundColor: AppColors.background,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      flexibleSpace: FlexibleSpaceBar(
+        titlePadding: const EdgeInsets.symmetric(horizontal: 20),
+        centerTitle: false,
+        title: Row(
+          children: [
+            const Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildFilterField(_brandController, 'Marka'),
-                const SizedBox(height: 10),
-                _buildFilterField(_modelController, 'Model'),
-                const SizedBox(height: 10),
-                Row(
+                Text('Merhaba,', style: TextStyle(fontSize: 14, color: AppColors.textHint, fontWeight: FontWeight.w400)),
+                Text('Kıbrıs Oto İlan', style: TextStyle(fontSize: 20, color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const Spacer(),
+            Container(
+              decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle, border: Border.all(color: Colors.white10)),
+              child: IconButton(
+                icon: const Icon(Icons.notifications_outlined, color: AppColors.textPrimary),
+                onPressed: () {},
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {},
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.05)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.search, color: AppColors.primary, size: 28),
+                SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _buildFilterField(_minPriceController, 'Min Fiyat', keyboardType: TextInputType.number)),
-                    const SizedBox(width: 10),
-                    Expanded(child: _buildFilterField(_maxPriceController, 'Maks Fiyat', keyboardType: TextInputType.number)),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                _buildFilterDropdown<Currency>(
-                  'Para Birimi', _selectedCurrency, Currency.values,
-                  (v) => setState(() => _selectedCurrency = v),
-                  (e) => EnumLabels.currency[e] ?? e.name.toUpperCase(),
-                ),
-                const SizedBox(height: 10),
-                _buildFilterDropdown<String>(
-                  'Şehir', _selectedCity, CyprusCities.cities,
-                  (v) => setState(() => _selectedCity = v),
-                  (e) => e,
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(child: _buildFilterField(_minMileageController, 'Min KM', keyboardType: TextInputType.number)),
-                    const SizedBox(width: 10),
-                    Expanded(child: _buildFilterField(_maxMileageController, 'Maks KM', keyboardType: TextInputType.number)),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                _buildFilterField(_engineSizeController, 'Motor Hacmi (cc)', keyboardType: TextInputType.number),
-                const SizedBox(height: 10),
-                _buildFilterDropdown<BodyType>(
-                  'Kasa Tipi', _selectedBodyType, BodyType.values,
-                  (v) => setState(() => _selectedBodyType = v),
-                  (e) => EnumLabels.bodyType[e] ?? e.name,
-                ),
-                const SizedBox(height: 10),
-                _buildFilterDropdown<TransmissionType>(
-                  'Vites Tipi', _selectedTransmission, TransmissionType.values,
-                  (v) => setState(() => _selectedTransmission = v),
-                  (e) => EnumLabels.transmission[e] ?? e.name,
-                ),
-                const SizedBox(height: 10),
-                _buildFilterDropdown<SteeringType>(
-                  'Direksiyon', _selectedSteering, SteeringType.values,
-                  (v) => setState(() => _selectedSteering = v),
-                  (e) => EnumLabels.steering[e] ?? e.name,
-                ),
-                const SizedBox(height: 10),
-                _buildFilterField(_colorController, 'Renk'),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _applyFilters,
-                        child: const Text('Filtrele'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _resetFilters,
-                        child: const Text('Sıfırla'),
-                      ),
-                    ),
+                    Text('Hayalindeki aracı bul...', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
+                    Text('Marka, model veya yıl ara', style: TextStyle(color: AppColors.textHint, fontSize: 12)),
                   ],
                 ),
               ],
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildFilterField(TextEditingController controller, String label,
-      {TextInputType keyboardType = TextInputType.text}) {
-    return TextField(
-      controller: controller,
-      style: AppTextStyles.input,
-      keyboardType: keyboardType,
-      decoration: AppDecorations.dropdown(label: label),
+  Widget _buildSectionHeader({required String title, required VoidCallback onSeeAll}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          TextButton(
+            onPressed: onSeeAll, 
+            child: Text(title == 'Popüler Markalar' ? 'Temizle' : 'Tümü', style: const TextStyle(color: AppColors.primary))
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildFilterDropdown<T>(
-    String label, T? value, List<T> items,
-    ValueChanged<T?> onChanged, String Function(T) itemLabel,
-  ) {
-    return DropdownButtonFormField<T>(
-      initialValue: value,
-      decoration: AppDecorations.dropdown(label: label),
-      dropdownColor: AppColors.surface,
-      style: AppTextStyles.input,
-      items: [
-        DropdownMenuItem<T>(value: null, child: Text('Seçiniz', style: AppTextStyles.hint)),
-        ...items.map((item) => DropdownMenuItem<T>(value: item, child: Text(itemLabel(item)))),
-      ],
-      onChanged: onChanged,
+  Widget _buildBrandList() {
+    final brands = [
+      {'name': 'BMW', 'icon': Icons.directions_car},
+      {'name': 'Mercedes', 'icon': Icons.stars},
+      {'name': 'Audi', 'icon': Icons.incomplete_circle},
+      {'name': 'Toyota', 'icon': Icons.airport_shuttle},
+      {'name': 'Honda', 'icon': Icons.local_taxi},
+      {'name': 'Ford', 'icon': Icons.commute},
+    ];
+    return SizedBox(
+      height: 100,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        itemCount: brands.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 15),
+        itemBuilder: (context, index) {
+          final brand = brands[index];
+          final isSelected = _selectedBrand == brand['name'];
+          return Column(
+            children: [
+              InkWell(
+                onTap: () => _fetchCars(brand: brand['name'] as String),
+                borderRadius: BorderRadius.circular(30),
+                child: Container(
+                  width: 60, height: 60,
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : AppColors.surface, 
+                    shape: BoxShape.circle, 
+                    border: Border.all(color: isSelected ? AppColors.primary : Colors.white10),
+                  ),
+                  child: Icon(brand['icon'] as IconData, color: isSelected ? Colors.black : AppColors.textPrimary, size: 30),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(brand['name'] as String, style: TextStyle(color: isSelected ? AppColors.primary : AppColors.textHint, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500)),
+            ],
+          );
+        },
+      ),
     );
   }
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    _brandController.removeListener(_onSearchChanged);
-    _modelController.removeListener(_onSearchChanged);
-    _brandController.dispose();
-    _modelController.dispose();
-    _minPriceController.dispose();
-    _maxPriceController.dispose();
-    _minMileageController.dispose();
-    _maxMileageController.dispose();
-    _engineSizeController.dispose();
-    _colorController.dispose();
-    _debounce?.cancel();
-    super.dispose();
+  Widget _buildCarGrid() {
+    return BlocBuilder<CarBloc, CarState>(
+      // NOKTA ATIŞI: Sadece bu durumlar oluştuğunda UI'ı baştan çiz. 
+      // Detay yüklendiğinde veya favori değiştiğinde gridi bozma.
+      buildWhen: (previous, current) => 
+          current is CarsLoaded || current is CarLoading || current is CarInitial || current is CarError,
+      builder: (context, state) {
+        if (state is CarInitial || state is CarLoading) {
+          return const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: AppColors.primary)));
+        } else if (state is CarError) {
+          return SliverFillRemaining(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+                  const SizedBox(height: 16),
+                  Text(state.message, style: const TextStyle(color: AppColors.textHint)),
+                  const SizedBox(height: 16),
+                  ElevatedButton(onPressed: () => _fetchCars(brand: _selectedBrand), child: const Text('Tekrar Dene')),
+                ],
+              ),
+            ),
+          );
+        } else if (state is CarsLoaded) {
+          if (state.cars.isEmpty) {
+            return const SliverFillRemaining(child: Center(child: Text('İlan bulunamadı.', style: TextStyle(color: AppColors.textHint))));
+          }
+          return SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.70,
+                crossAxisSpacing: 15,
+                mainAxisSpacing: 15,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final car = state.cars[index];
+                  return CarCard(
+                    car: car,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => CarDetailPage(car: car)),
+                      ); // .then(..) kısmını kaldırdım, çünkü CarBloc artık listeyi otomatik güncelliyor.
+                    },
+                  );
+                },
+                childCount: state.cars.length,
+              ),
+            ),
+          );
+        }
+        return const SliverToBoxAdapter(child: SizedBox.shrink());
+      },
+    );
   }
 }

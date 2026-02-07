@@ -218,6 +218,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'E-posta',
             Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
+            maxLength: 100, // ADDED
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Lütfen bir e-posta adresi girin';
@@ -236,6 +237,7 @@ class _RegisterPageState extends State<RegisterPage> {
             _usernameController,
             'Kullanıcı Adı',
             Icons.person_outline,
+            maxLength: 100, // ADDED
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Lütfen bir kullanıcı adı girin';
@@ -255,6 +257,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'Şifre',
             Icons.lock_outline,
             obscureText: !_isPasswordVisible,
+            maxLength: 100, // ADDED
             suffixIcon: IconButton(
               icon: Icon(
                 _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
@@ -272,6 +275,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'Şifre Tekrar',
             Icons.lock_outline,
             obscureText: !_isPasswordConfirmVisible,
+            maxLength: 100, // ADDED
             suffixIcon: IconButton(
               icon: Icon(
                 _isPasswordConfirmVisible ? Icons.visibility : Icons.visibility_off,
@@ -369,13 +373,14 @@ class _RegisterPageState extends State<RegisterPage> {
       child: _buildCard(
         title: 'Kişisel Bilgiler',
         children: [
-          _buildTextFormField(_fullNameController, 'Ad Soyad', Icons.badge_outlined),
+          _buildTextFormField(_fullNameController, 'Ad Soyad', Icons.badge_outlined, maxLength: 100), // ADDED
           const SizedBox(height: 16),
           _buildTextFormField(
             _phoneNumberController,
             'Telefon Numarası',
             Icons.phone_outlined,
             keyboardType: TextInputType.phone,
+            maxLength: 100, // ADDED
             validator: (value) {
               if (_isCorporate && (value == null || value.isEmpty)) {
                 return 'Kurumsal hesaplar için telefon numarası zorunludur';
@@ -456,6 +461,7 @@ class _RegisterPageState extends State<RegisterPage> {
             _companyNameController,
             'Şirket Adı',
             Icons.business_outlined,
+            maxLength: 100, // ADDED
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Şirket adı zorunludur';
@@ -469,6 +475,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'Vergi Numarası',
             Icons.numbers,
             keyboardType: TextInputType.number,
+            maxLength: 100, // ADDED
             validator: (value) {
               if (value == null || value.isEmpty) {
                 return 'Vergi numarası zorunludur';
@@ -482,6 +489,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'Sabit Telefon',
             Icons.phone_callback_outlined,
             keyboardType: TextInputType.phone,
+            maxLength: 100, // ADDED
           ),
           const SizedBox(height: 16),
           _buildTextFormField(
@@ -489,6 +497,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'Adres Detayı',
             Icons.home_outlined,
             maxLines: 2,
+            maxLength: 255, // ADDED
           ),
           const SizedBox(height: 16),
           _buildTextFormField(
@@ -496,6 +505,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'Haritalar URL\'si',
             Icons.map_outlined,
             keyboardType: TextInputType.url,
+            maxLength: 255, // ADDED
           ),
           const SizedBox(height: 16),
           _buildTextFormField(
@@ -503,6 +513,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'Web Sitesi',
             Icons.web_outlined,
             keyboardType: TextInputType.url,
+            maxLength: 255, // ADDED
           ),
         ],
       ),
@@ -521,6 +532,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'Profil Fotoğrafı URL\'si',
             Icons.image_outlined,
             keyboardType: TextInputType.url,
+            maxLength: 255, // ADDED
           ),
           const SizedBox(height: 16),
           _buildTextFormField(
@@ -528,6 +540,7 @@ class _RegisterPageState extends State<RegisterPage> {
             'Hakkında',
             Icons.info_outline,
             maxLines: 3,
+            maxLength: 1000, // ADDED
           ),
           const SizedBox(height: 16),
           Container(
@@ -803,6 +816,7 @@ class _RegisterPageState extends State<RegisterPage> {
     int maxLines = 1,
     Widget? suffixIcon,
     String? Function(String?)? validator,
+    int? maxLength, // ADDED PARAMETER
   }) {
     return TextFormField(
       controller: controller,
@@ -810,6 +824,7 @@ class _RegisterPageState extends State<RegisterPage> {
       style: AppTextStyles.input,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      maxLength: maxLength, // USED PARAMETER
       decoration: _buildInputDecoration(labelText, icon, suffixIcon: suffixIcon),
       validator: validator,
       onChanged: labelText == 'Şifre' ? (_) => setState(() {}) : null,

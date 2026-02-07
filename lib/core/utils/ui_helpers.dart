@@ -24,24 +24,16 @@ class UIHelpers {
   static String formatPrice(double price, Currency currency) {
     String symbol;
     switch (currency) {
-      case Currency.try_:
-        symbol = '₺';
-        break;
-      case Currency.gbp:
-        symbol = '£';
-        break;
-      case Currency.eur:
-        symbol = '€';
-        break;
-      case Currency.usd:
-        symbol = '\$';
-        break;
+      case Currency.try_: symbol = '₺'; break;
+      case Currency.gbp: symbol = '£'; break;
+      case Currency.eur: symbol = '€'; break;
+      case Currency.usd: symbol = '\$'; break;
     }
 
     final format = NumberFormat.currency(
-      locale: 'tr_TR', // Assuming Turkish locale for number formatting
+      locale: 'tr_TR',
       symbol: symbol,
-      decimalDigits: 0, // No decimal digits for currency in this app
+      decimalDigits: 0,
     );
 
     return format.format(price);
@@ -51,13 +43,12 @@ class UIHelpers {
     double price, {
     required Currency originalCurrency,
     required DisplayCurrency displayCurrency,
-    required double gbpToTryRate,
+    double? gbpToTryRate,
   }) {
-    final targetCurrency =
-        displayCurrency == DisplayCurrency.gbp ? Currency.gbp : Currency.try_;
+    final targetCurrency = displayCurrency == DisplayCurrency.gbp ? Currency.gbp : Currency.try_;
 
-    // Already in the target currency
-    if (originalCurrency == targetCurrency) {
+    // Kur oranı yoksa, 0 ise veya para birimleri zaten aynıysa çevirme yapma
+    if (gbpToTryRate == null || gbpToTryRate <= 0 || originalCurrency == targetCurrency) {
       return formatPrice(price, originalCurrency);
     }
 
@@ -71,27 +62,21 @@ class UIHelpers {
       return formatPrice(price / gbpToTryRate, Currency.gbp);
     }
 
-    // EUR/USD → no rate available, show original
     return formatPrice(price, originalCurrency);
   }
 
   static String translateTransmission(TransmissionType transmission) {
     switch (transmission) {
-      case TransmissionType.manual:
-        return 'Manuel';
-      case TransmissionType.automatic:
-        return 'Otomatik';
-      case TransmissionType.semiAutomatic:
-        return 'Yarı Otomatik';
+      case TransmissionType.manual: return 'Manuel';
+      case TransmissionType.automatic: return 'Otomatik';
+      case TransmissionType.semiAutomatic: return 'Yarı Otomatik';
     }
   }
 
   static String translateSteering(SteeringType steering) {
     switch (steering) {
-      case SteeringType.left:
-        return 'Soldan';
-      case SteeringType.right:
-        return 'Sağdan';
+      case SteeringType.left: return 'Soldan';
+      case SteeringType.right: return 'Sağdan';
     }
   }
 
@@ -103,22 +88,15 @@ class UIHelpers {
     return mileage.toString();
   }
 
-  // Helper to translate FuelType (which is a String in CarEntity)
   static String translateFuelType(String? fuelType) {
     if (fuelType == null || fuelType.isEmpty) return 'Bilinmiyor';
     switch (fuelType.toLowerCase()) {
-      case 'gasoline':
-        return 'Benzin';
-      case 'diesel':
-        return 'Dizel';
-      case 'electric':
-        return 'Elektrik';
-      case 'hybrid':
-        return 'Hibrit';
-      case 'lpg':
-        return 'LPG';
-      default:
-        return fuelType; // Return as is if no translation
+      case 'gasoline': return 'Benzin';
+      case 'diesel': return 'Dizel';
+      case 'electric': return 'Elektrik';
+      case 'hybrid': return 'Hibrit';
+      case 'lpg': return 'LPG';
+      default: return fuelType;
     }
   }
 }

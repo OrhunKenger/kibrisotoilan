@@ -40,6 +40,12 @@ class AppTextStyles {
         color: AppColors.textPrimary,
       );
 
+  static TextStyle get bodyBold => GoogleFonts.poppins(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      );
+
   static TextStyle get bodySecondary => GoogleFonts.poppins(
         fontSize: 14,
         color: AppColors.textSecondary,

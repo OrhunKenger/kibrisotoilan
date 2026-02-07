@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../core/network/dio_error_handler.dart';
 import '../../domain/entities/car_enums.dart';
 import '../models/car_model.dart';
@@ -64,6 +65,8 @@ abstract class CarRemoteDataSource {
   Future<void> addFavorite(int id);
   Future<void> removeFavorite(int id);
   Future<List<CarModel>> getMyFavorites({required int page, required int limit});
+  Future<List<String>> getUniqueBrands();
+  Future<List<String>> getModelsByBrand(String brand);
 }
 
 class CarRemoteDataSourceImpl implements CarRemoteDataSource {
@@ -112,24 +115,26 @@ class CarRemoteDataSourceImpl implements CarRemoteDataSource {
     };
 
     try {
-      final response = await dio.get('/cars', queryParameters: queryParameters);
-      List<dynamic> dataList;
+      final response = await dio.get('/cars/', queryParameters: queryParameters);
+      List<dynamic> dataList = [];
 
-      if (response.data is Map<String, dynamic>) {
-        if (response.data.containsKey('items')) {
-          dataList = response.data['items'];
-        } else if (response.data.containsKey('data')) {
-          dataList = response.data['data'];
-        } else {
-          dataList = [];
-        }
-      } else if (response.data is List) {
+      if (response.data is List) {
         dataList = response.data;
-      } else {
-        dataList = [];
+      } else if (response.data is Map<String, dynamic>) {
+        dataList = response.data['items'] ?? response.data['data'] ?? [];
       }
 
-      return dataList.map((e) => CarModel.fromJson(e)).toList();
+      final List<CarModel> cars = [];
+      for (var e in dataList) {
+        try {
+          if (e is Map<String, dynamic>) {
+            cars.add(CarModel.fromJson(e));
+          }
+        } catch (err) {
+          if (kDebugMode) print('SKIPPING ITEM: Mapping error: $err');
+        }
+      }
+      return cars;
     } on DioException catch (e) {
       _handleDioException(e);
     }
@@ -139,7 +144,8 @@ class CarRemoteDataSourceImpl implements CarRemoteDataSource {
   Future<CarModel> getCarById(int id) async {
     try {
       final response = await dio.get('/cars/$id');
-      return CarModel.fromJson(response.data);
+      final data = response.data;
+      return CarModel.fromJson(data);
     } on DioException catch (e) {
       _handleDioException(e);
     }
@@ -156,7 +162,7 @@ class CarRemoteDataSourceImpl implements CarRemoteDataSource {
           key == 'created_at' ||
           key == 'updated_at' ||
           key == 'is_deleted');
-      final response = await dio.post('/cars', data: json);
+      final response = await dio.post('/cars/', data: json);
       return CarModel.fromJson(response.data);
     } on DioException catch (e) {
       _handleDioException(e);
@@ -212,4 +218,27 @@ class CarRemoteDataSourceImpl implements CarRemoteDataSource {
   }
 
   Never _handleDioException(DioException e) => DioErrorHandler.handle(e);
+
+  @override
+  Future<List<String>> getUniqueBrands() async {
+    try {
+      final response = await dio.get(
+        '/cars/brands',
+        queryParameters: {'page': 1, 'size': 50},
+      );
+      return (response.data as List).map((e) => e.toString()).toList();
+    } on DioException catch (e) {
+      _handleDioException(e);
+    }
+  }
+
+  @override
+  Future<List<String>> getModelsByBrand(String brand) async {
+    try {
+      final response = await dio.get('/cars/models', queryParameters: {'brand': brand});
+      return (response.data as List).map((e) => e.toString()).toList();
+    } on DioException catch (e) {
+      _handleDioException(e);
+    }
+  }
 }

@@ -36,4 +36,7 @@ abstract class CarRepository {
     required int page,
     required int limit,
   });
+
+  Future<Either<Failure, List<String>>> getUniqueBrands();
+  Future<Either<Failure, List<String>>> getModelsByBrand(String brand);
 }

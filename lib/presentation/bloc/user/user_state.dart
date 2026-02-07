@@ -53,6 +53,19 @@ class UserUpdateError extends UserState {
   List<Object> get props => [message];
 }
 
+class UserDeleted extends UserState {
+  const UserDeleted();
+}
+
+class UserVerificationRequired extends UserState {
+  final String codeType;
+  final Map<String, dynamic> data; // The original data sent for update
+  const UserVerificationRequired({required this.codeType, required this.data});
+
+  @override
+  List<Object> get props => [codeType, data];
+}
+
 class MyListingsLoading extends UserState {
   const MyListingsLoading();
 }

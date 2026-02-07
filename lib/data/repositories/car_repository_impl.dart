@@ -167,4 +167,32 @@ class CarRepositoryImpl implements CarRepository {
       return Left(ServerFailure(message: e.message ?? 'Sunucu hatası'));
     }
   }
+
+  @override
+  Future<Either<Failure, List<String>>> getUniqueBrands() async {
+    try {
+      final brands = await remoteDataSource.getUniqueBrands();
+      return Right(brands);
+    } on UnauthorizedException {
+      return Left(UnauthorizedFailure());
+    } on NetworkException catch (e) {
+      return Left(ConnectionFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message ?? 'Sunucu hatası'));
+    }
+  }
+
+  @override
+  Future<Either<Failure, List<String>>> getModelsByBrand(String brand) async {
+    try {
+      final models = await remoteDataSource.getModelsByBrand(brand);
+      return Right(models);
+    } on UnauthorizedException {
+      return Left(UnauthorizedFailure());
+    } on NetworkException catch (e) {
+      return Left(ConnectionFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message ?? 'Sunucu hatası'));
+    }
+  }
 }

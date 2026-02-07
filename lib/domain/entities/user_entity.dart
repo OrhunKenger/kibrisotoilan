@@ -22,6 +22,9 @@ class UserEntity extends Equatable {
   final String? addressDetail;
   final String? mapsUrl;
   final String? website;
+  final int activeAdsCount; // New
+  final int totalViewsCount; // New
+  final int favoritesCount; // New
 
   const UserEntity({
     required this.id,
@@ -43,6 +46,9 @@ class UserEntity extends Equatable {
     this.addressDetail,
     this.mapsUrl,
     this.website,
+    this.activeAdsCount = 0, // New
+    this.totalViewsCount = 0, // New
+    this.favoritesCount = 0, // New
   });
 
   @override
@@ -66,5 +72,8 @@ class UserEntity extends Equatable {
         addressDetail,
         mapsUrl,
         website,
+        activeAdsCount, // New
+        totalViewsCount, // New
+        favoritesCount, // New
       ];
 }

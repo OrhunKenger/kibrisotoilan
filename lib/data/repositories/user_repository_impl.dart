@@ -57,4 +57,18 @@ class UserRepositoryImpl implements UserRepository {
       return Left(ServerFailure(message: e.message ?? 'İlanlar alınamadı'));
     }
   }
+
+  @override
+  Future<Either<Failure, void>> deleteUser() async {
+    try {
+      await remoteDataSource.deleteUser();
+      return const Right(null);
+    } on UnauthorizedException {
+      return Left(UnauthorizedFailure());
+    } on NetworkException catch (e) {
+      return Left(ConnectionFailure(message: e.message));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message ?? 'Hesap silinemedi'));
+    }
+  }
 }

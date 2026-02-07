@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'car_enums.dart';
+import 'user_entity.dart';
 
 class CarEntity extends Equatable {
   final int? id;
@@ -25,9 +26,12 @@ class CarEntity extends Equatable {
   final String? fuelType;
   final List<String> imageUrls;
   final int? ownerId;
+  final UserEntity? owner;  // Owner bilgileri
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final bool? isDeleted;
+  final String? status;
+  final int viewsCount;
   final ExchangeRatesEntity? exchangeRates;
   final String steeringSide;
   final String registrationStatus;
@@ -57,9 +61,12 @@ class CarEntity extends Equatable {
     this.fuelType,
     this.imageUrls = const [],
     this.ownerId,
+    this.owner,
     this.createdAt,
     this.updatedAt,
     this.isDeleted,
+    this.status,
+    this.viewsCount = 0,
     this.exchangeRates,
     required this.steeringSide,
     required this.registrationStatus,
@@ -93,9 +100,12 @@ class CarEntity extends Equatable {
         fuelType,
         imageUrls,
         ownerId,
+        owner,
         createdAt,
         updatedAt,
         isDeleted,
+        status,
+        viewsCount,
         exchangeRates,
         steeringSide,
         registrationStatus,

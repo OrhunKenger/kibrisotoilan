@@ -22,7 +22,6 @@ class _MainWrapperState extends State<MainWrapper> {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<CarBloc>(create: (_) => di.sl<CarBloc>()),
         BlocProvider<UserBloc>(create: (_) => di.sl<UserBloc>()),
       ],
       child: Builder(

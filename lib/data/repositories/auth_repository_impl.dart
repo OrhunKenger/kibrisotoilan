@@ -23,9 +23,10 @@ class AuthRepositoryImpl implements AuthRepository {
     } on NetworkException catch (e) {
       return Left(ConnectionFailure(message: e.message));
     } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message ?? 'Giriş başarısız'));
+      return Left(ServerFailure(message: e.message ?? 'Giriş yapılamadı.'));
     } catch (e) {
-      return Left(ServerFailure(message: 'Beklenmeyen hata: ${e.toString()}'));
+      // Log error here (e.g. Firebase Crashlytics)
+      return Left(ServerFailure(message: 'Beklenmeyen bir sorun oluştu. Lütfen tekrar deneyin.'));
     }
   }
 
@@ -59,9 +60,9 @@ class AuthRepositoryImpl implements AuthRepository {
     } on NetworkException catch (e) {
       return Left(ConnectionFailure(message: e.message));
     } on ServerException catch (e) {
-      return Left(ServerFailure(message: e.message ?? 'Kayıt başarısız'));
+      return Left(ServerFailure(message: e.message ?? 'Kayıt işlemi başarısız.'));
     } catch (e) {
-      return Left(ServerFailure(message: 'Beklenmeyen hata: ${e.toString()}'));
+      return Left(ServerFailure(message: 'Kayıt sırasında bir hata oluştu.'));
     }
   }
 
@@ -71,7 +72,7 @@ class AuthRepositoryImpl implements AuthRepository {
       await localDataSource.saveToken(token);
       return const Right(unit);
     } catch (e) {
-      return Left(CacheFailure(message: 'Token kaydedilemedi'));
+      return Left(CacheFailure(message: 'Oturum bilgisi kaydedilemedi.'));
     }
   }
 
@@ -81,7 +82,7 @@ class AuthRepositoryImpl implements AuthRepository {
       final token = await localDataSource.getToken();
       return Right(token);
     } catch (e) {
-      return Left(CacheFailure(message: 'Token alınamadı'));
+      return Left(CacheFailure(message: 'Oturum bilgisi okunamadı.'));
     }
   }
 
@@ -91,7 +92,7 @@ class AuthRepositoryImpl implements AuthRepository {
       await localDataSource.deleteToken();
       return const Right(unit);
     } catch (e) {
-      return Left(CacheFailure(message: 'Token silinemedi'));
+      return Left(CacheFailure(message: 'Çıkış işlemi sırasında hata oluştu.'));
     }
   }
 }

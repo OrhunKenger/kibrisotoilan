@@ -15,6 +15,7 @@ import '../../injection_container.dart' as di;
 import '../bloc/car/car_bloc.dart';
 import '../bloc/car/car_event.dart';
 import '../bloc/car/car_state.dart';
+import '../widgets/brand_model_picker.dart';
 
 class CreateListingPage extends StatefulWidget {
   const CreateListingPage({super.key});
@@ -28,8 +29,9 @@ class _CreateListingPageState extends State<CreateListingPage> {
 
   // Temel Bilgiler
   final _titleController = TextEditingController();
-  final _brandController = TextEditingController();
-  final _modelController = TextEditingController();
+  String? _selectedBrand;
+  String? _selectedSeries;
+  String? _selectedModel;
   final _yearController = TextEditingController();
   final _colorController = TextEditingController();
 
@@ -137,19 +139,7 @@ class _CreateListingPageState extends State<CreateListingPage> {
                       _buildTextField(_titleController, 'İlan Başlığı', Icons.title,
                           validator: _requiredValidator, maxLength: 120),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField(_brandController, 'Marka', Icons.directions_car,
-                                validator: _requiredValidator, maxLength: 50),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildTextField(_modelController, 'Model', Icons.model_training,
-                                validator: _requiredValidator, maxLength: 50),
-                          ),
-                        ],
-                      ),
+                      _buildBrandModelSelector(),
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -196,34 +186,16 @@ class _CreateListingPageState extends State<CreateListingPage> {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: _buildEnumDropdown<SteeringType>(
-                              'Direksiyon',
-                              _selectedSteering,
-                              SteeringType.values,
-                              (v) => setState(() => _selectedSteering = v!),
-                              (e) => _steeringLabels[e] ?? e.name,
-                            ),
+                            child: _buildTextField(
+                                _engineSizeController, 'Motor Hacmi (cc)', Icons.speed,
+                                keyboardType: TextInputType.number, validator: (value) {
+                              if (value == null || value.isEmpty) return 'Zorunlu';
+                              if (int.tryParse(value) == null) return 'Geçerli bir sayı girin';
+                              return null;
+                            }),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      _buildFuelTypeDropdown(),
-                      const SizedBox(height: 12),
-                      _buildSectionTitle('Kıbrıs\'a Özel Alanlar'),
-                      const SizedBox(height: 12),
-                      _buildSteeringSideToggle(),
-                      const SizedBox(height: 12),
-                      _buildRegistrationStatusDropdown(),
-                      const SizedBox(height: 12),
-                      _buildLicenseSeriesField(),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                          _engineSizeController, 'Motor Hacmi (cc)', Icons.speed,
-                          keyboardType: TextInputType.number, validator: (value) {
-                        if (value == null || value.isEmpty) return 'Zorunlu';
-                        if (int.tryParse(value) == null) return 'Geçerli bir sayı girin';
-                        return null;
-                      }),
                       const SizedBox(height: 12),
                       Row(
                         children: [
@@ -249,6 +221,18 @@ class _CreateListingPageState extends State<CreateListingPage> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      _buildFuelTypeDropdown(),
+                      const SizedBox(height: 12),
+                      _buildSectionTitle('Kıbrıs\'a Özel Alanlar'),
+                      const SizedBox(height: 12),
+                      _buildSteeringSideToggle(),
+                      const SizedBox(height: 12),
+                      _buildRegistrationStatusDropdown(),
+                      const SizedBox(height: 12),
+                      _buildLicenseSeriesField(),
+                      const SizedBox(height: 12),
+
 
                       const SizedBox(height: 24),
                       _buildSectionTitle('Fiyat Bilgileri'),
@@ -342,6 +326,17 @@ class _CreateListingPageState extends State<CreateListingPage> {
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_selectedBrand == null || _selectedModel == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lutfen marka ve model secin', style: AppTextStyles.body),
+          backgroundColor: AppColors.warning,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (_selectedCity == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -396,10 +391,22 @@ class _CreateListingPageState extends State<CreateListingPage> {
       if (mounted) setState(() => _isUploading = false);
     }
 
+    // Argo Kelime Filtresi
+    if (_containsProfanity(_titleController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('İlan başlığında uygunsuz kelimeler tespit edildi. Lütfen düzeltin.', style: AppTextStyles.body),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final car = CarEntity(
       title: _titleController.text.trim(),
-      brand: _brandController.text.trim(),
-      model: _modelController.text.trim(),
+      brand: _selectedBrand!,
+      model: _selectedModel!,
       year: int.parse(_yearController.text.trim()),
       color: _colorController.text.trim(),
       bodyType: _selectedBodyType,
@@ -431,6 +438,27 @@ class _CreateListingPageState extends State<CreateListingPage> {
   String? _requiredValidator(String? value) {
     if (value == null || value.trim().isEmpty) return 'Bu alan zorunludur';
     return null;
+  }
+
+  bool _containsProfanity(String text) {
+    // Kapsamlı yasaklı kelime listesi
+    const bannedWords = [
+      'küfür1', 'küfür2', 'argo1', 'sik', 'amk', 'piç', 'göt', 'yarrak', 'meme', 'taşak', 'it', 'köpek', 'şerefsiz', 'adi', 'ahlaksız',
+      // Buraya daha fazla kelime eklenebilir veya bir servisten çekilebilir
+    ];
+
+    final cleanText = text.toLowerCase()
+      .replaceAll('ı', 'i')
+      .replaceAll('ü', 'u')
+      .replaceAll('ö', 'o')
+      .replaceAll('ş', 's')
+      .replaceAll('ç', 'c')
+      .replaceAll('ğ', 'g');
+
+    for (final word in bannedWords) {
+      if (cleanText.contains(word)) return true;
+    }
+    return false;
   }
 
   Widget _buildSectionTitle(String title) {
@@ -520,6 +548,54 @@ class _CreateListingPageState extends State<CreateListingPage> {
         );
       }).toList(),
       onChanged: onChanged,
+    );
+  }
+
+  Widget _buildBrandModelSelector() {
+    final hasSelection = _selectedBrand != null && _selectedModel != null;
+    final displayText = hasSelection
+        ? '$_selectedBrand $_selectedSeries $_selectedModel'
+        : 'Marka / Model Sec';
+
+    return GestureDetector(
+      onTap: () async {
+        final result = await showBrandModelPicker(context);
+        if (result != null) {
+          setState(() {
+            _selectedBrand = result.brand;
+            _selectedSeries = result.series;
+            _selectedModel = result.model;
+          });
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: hasSelection
+              ? Border.all(color: AppColors.primary.withValues(alpha: 0.3))
+              : null,
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.directions_car,
+              color: hasSelection ? AppColors.primary : AppColors.textHint,
+              size: 22,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                displayText,
+                style: hasSelection ? AppTextStyles.body : AppTextStyles.hint,
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AppColors.textHint),
+          ],
+        ),
+      ),
     );
   }
 
@@ -881,8 +957,6 @@ class _CreateListingPageState extends State<CreateListingPage> {
   @override
   void dispose() {
     _titleController.dispose();
-    _brandController.dispose();
-    _modelController.dispose();
     _yearController.dispose();
     _colorController.dispose();
     _engineSizeController.dispose();

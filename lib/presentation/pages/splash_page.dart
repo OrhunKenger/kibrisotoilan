@@ -14,23 +14,33 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
   late AnimationController _controller;
   late Animation<double> _fadeAnim;
   late Animation<double> _scaleAnim;
+  late Animation<double> _sloganFadeAnim;
+  late Animation<double> _progressFadeAnim;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1800), // Increased duration for staggered animations
     );
     _fadeAnim = CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeIn,
+      curve: const Interval(0.0, 0.6, curve: Curves.easeIn), // Main logo/text fade
     );
     _scaleAnim = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: Curves.easeOutBack,
+        curve: const Interval(0.0, 0.6, curve: Curves.fastOutSlowIn), // Main logo/text scale
       ),
+    );
+    _sloganFadeAnim = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.5, 0.8, curve: Curves.easeIn),
+    );
+    _progressFadeAnim = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.7, 1.0, curve: Curves.easeIn),
     );
     _controller.forward();
   }
@@ -51,7 +61,7 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.15),
+                    color: AppColors.primary.withOpacity(0.15),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -66,18 +76,24 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                   style: AppTextStyles.heading1.copyWith(fontSize: 48),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Kuzey Kıbrıs\'ın Oto Pazarı',
-                  style: AppTextStyles.bodySecondary.copyWith(fontSize: 14, letterSpacing: 1.2),
+                FadeTransition(
+                  opacity: _sloganFadeAnim,
+                  child: Text(
+                    'Kuzey Kıbrıs\'ın Oto Pazarı',
+                    style: AppTextStyles.bodySecondary.copyWith(fontSize: 14, letterSpacing: 1.2),
+                  ),
                 ),
                 const SizedBox(height: 48),
-                SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).primaryColor,
+                FadeTransition(
+                  opacity: _progressFadeAnim,
+                  child: SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Theme.of(context).primaryColor,
+                      ),
                     ),
                   ),
                 ),

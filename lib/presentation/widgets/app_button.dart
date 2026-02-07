@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_colors.dart'; // New Import
 
 class AppButton extends StatelessWidget {
   final String label;
@@ -9,6 +10,7 @@ class AppButton extends StatelessWidget {
   final double? width;
   final double height;
   final IconData? icon;
+  final Color? backgroundColor; // New
 
   const AppButton({
     super.key,
@@ -19,6 +21,7 @@ class AppButton extends StatelessWidget {
     this.width,
     this.height = 52,
     this.icon,
+    this.backgroundColor, // New
   });
 
   @override
@@ -48,6 +51,10 @@ class AppButton extends StatelessWidget {
         width: width ?? double.infinity,
         height: height,
         child: OutlinedButton(
+          style: OutlinedButton.styleFrom( // Modified
+            foregroundColor: backgroundColor ?? AppColors.primary,
+            side: BorderSide(color: backgroundColor ?? AppColors.primary),
+          ),
           onPressed: isLoading ? null : onPressed,
           child: child,
         ),
@@ -58,6 +65,9 @@ class AppButton extends StatelessWidget {
       width: width ?? double.infinity,
       height: height,
       child: ElevatedButton(
+        style: ElevatedButton.styleFrom( // Modified
+          backgroundColor: backgroundColor ?? AppColors.primary,
+        ),
         onPressed: isLoading ? null : onPressed,
         child: child,
       ),

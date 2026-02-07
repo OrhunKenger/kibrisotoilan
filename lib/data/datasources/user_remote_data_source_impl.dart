@@ -51,4 +51,13 @@ class UserRemoteDataSourceImpl implements UserRemoteDataSource {
   }
 
   Never _handleDioException(DioException e) => DioErrorHandler.handle(e);
+
+  @override
+  Future<void> deleteUser() async {
+    try {
+      await dio.delete('/users/me');
+    } on DioException catch (e) {
+      _handleDioException(e);
+    }
+  }
 }

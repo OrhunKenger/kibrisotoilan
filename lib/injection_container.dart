@@ -8,6 +8,7 @@ import 'core/config/env_config.dart';
 import 'core/network/auth_interceptor.dart';
 import 'core/network/retry_interceptor.dart';
 import 'core/services/lookup_service.dart';
+import 'core/services/brand_service.dart';
 
 // Data sources
 import 'data/datasources/car_remote_data_source.dart';
@@ -34,6 +35,9 @@ import 'domain/usecases/get_my_favorites_usecase.dart';
 import 'domain/usecases/get_user_profile_usecase.dart';
 import 'domain/usecases/update_user_profile_usecase.dart';
 import 'domain/usecases/get_my_listings_usecase.dart';
+import 'domain/usecases/soft_delete_user.dart'; // New Import
+import 'domain/usecases/get_unique_brands_usecase.dart'; // Yeni
+import 'domain/usecases/get_models_by_brand_usecase.dart'; // Yeni
 
 // Blocs
 import 'presentation/bloc/car/car_bloc.dart';
@@ -97,6 +101,9 @@ Future<void> init() async {
   sl.registerLazySingleton<LookupService>(
     () => LookupService(dio: sl()),
   );
+  sl.registerLazySingleton<BrandService>(
+    () => BrandService(dio: sl()),
+  );
 
   // Data sources
   sl.registerLazySingleton<CarRemoteDataSource>(
@@ -133,6 +140,9 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetUserProfile(sl()));
   sl.registerLazySingleton(() => UpdateUserProfile(sl()));
   sl.registerLazySingleton(() => GetMyListings(sl()));
+  sl.registerLazySingleton(() => SoftDeleteUser(sl())); // New
+  sl.registerLazySingleton(() => GetUniqueBrands(sl())); // Yeni
+  sl.registerLazySingleton(() => GetModelsByBrand(sl())); // Yeni
 
   // Blocs
   sl.registerFactory(() => CarBloc(
@@ -142,11 +152,14 @@ Future<void> init() async {
         addFavoriteUseCase: sl(),
         removeFavoriteUseCase: sl(),
         getMyFavoritesUseCase: sl(),
+        getUniqueBrandsUseCase: sl(), // Yeni
+        getModelsByBrandUseCase: sl(), // Yeni
       ));
   sl.registerFactory(() => AuthBloc(authRepository: sl()));
   sl.registerFactory(() => UserBloc(
         getUserProfileUseCase: sl(),
         updateUserProfileUseCase: sl(),
         getMyListingsUseCase: sl(),
+        softDeleteUserUseCase: sl(), // New
       ));
 }

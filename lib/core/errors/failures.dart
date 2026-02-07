@@ -29,3 +29,8 @@ class ConnectionFailure extends Failure {
 class UnauthorizedFailure extends Failure {
   UnauthorizedFailure({String message = 'Oturum suresi doldu, tekrar giris yapin'}) : super([message], message);
 }
+
+class VerificationRequiredFailure extends Failure {
+  final String codeType;
+  VerificationRequiredFailure({required String message, required this.codeType}) : super([codeType], message);
+}

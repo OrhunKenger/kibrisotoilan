@@ -59,12 +59,9 @@ class _MyListingsPageState extends State<MyListingsPage> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => BlocProvider.value(
-                            value: context.read<CarBloc>(),
-                            child: CarDetailPage(carId: car.id!),
-                          ),
+                          builder: (_) => CarDetailPage(car: car),
                         ),
-                      );
+                      ).then((_) => _load()); // Geri dönüldüğünde profil listesini de tazele
                     },
                   );
                 },

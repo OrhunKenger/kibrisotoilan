@@ -22,15 +22,15 @@ class UserTypeSelectionPage extends StatelessWidget {
                 const SizedBox(height: 32),
                 // Logo section
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: 120,
+                  height: 120,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.15),
+                    color: AppColors.primary.withOpacity(0.15),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.directions_car,
-                    size: 44,
+                    size: 60,
                     color: AppColors.primary,
                   ),
                 ),
@@ -39,12 +39,12 @@ class UserTypeSelectionPage extends StatelessWidget {
                   'KıbrısOto',
                   style: AppTextStyles.heading1,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 Text(
                   'Hoş Geldiniz!',
-                  style: AppTextStyles.heading3,
+                  style: AppTextStyles.heading2,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   'Size daha iyi hizmet verebilmemiz için\nhesap türünüzü seçin.',
                   textAlign: TextAlign.center,
@@ -125,12 +125,12 @@ class UserTypeSelectionPage extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
-          colors: [gradientColors[0].withValues(alpha: 0.15), gradientColors[1].withValues(alpha: 0.05)],
+          colors: [gradientColors[0].withOpacity(0.15), gradientColors[1].withOpacity(0.05)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         border: Border.all(
-          color: gradientColors[0].withValues(alpha: 0.3),
+          color: gradientColors[0].withOpacity(0.3),
           width: 1.5,
         ),
       ),
@@ -153,7 +153,7 @@ class UserTypeSelectionPage extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: gradientColors[0].withValues(alpha: 0.15),
+                    color: gradientColors[0].withOpacity(0.15),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
@@ -182,7 +182,7 @@ class UserTypeSelectionPage extends StatelessWidget {
                 Icon(
                   Icons.arrow_forward_ios,
                   size: 18,
-                  color: gradientColors[0].withValues(alpha: 0.6),
+                  color: gradientColors[0].withOpacity(0.6),
                 ),
               ],
             ),

@@ -100,3 +100,20 @@ class FavoriteError extends CarState {
   @override
   List<Object?> get props => [message];
 }
+
+class CarBrandsLoaded extends CarState {
+  final List<String> brands;
+  const CarBrandsLoaded({required this.brands});
+
+  @override
+  List<Object?> get props => [brands];
+}
+
+class CarModelsLoaded extends CarState {
+  final List<String> models;
+  final String brand; // To identify which brand these models belong to
+  const CarModelsLoaded({required this.models, required this.brand});
+
+  @override
+  List<Object?> get props => [models, brand];
+}

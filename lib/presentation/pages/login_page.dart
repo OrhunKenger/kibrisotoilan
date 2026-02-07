@@ -103,6 +103,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       style: AppTextStyles.input,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
+                      maxLength: 100, // ADDED MAX LENGTH
                       decoration: _buildInputDecoration(
                         'E-posta veya Kullanıcı Adı',
                         Icons.person_outline,
@@ -121,6 +122,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       obscureText: !_isPasswordVisible,
                       style: AppTextStyles.input,
                       textInputAction: TextInputAction.done,
+                      maxLength: 100, // ADDED MAX LENGTH
                       onFieldSubmitted: (_) => _submitLogin(),
                       decoration: _buildInputDecoration(
                         'Şifre',

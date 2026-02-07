@@ -20,6 +20,10 @@ class UpdateUserProfileEvent extends UserEvent {
   List<Object> get props => [data];
 }
 
+class UserDeleteEvent extends UserEvent {
+  const UserDeleteEvent();
+}
+
 class GetMyListingsEvent extends UserEvent {
   final int page;
   final int limit;
