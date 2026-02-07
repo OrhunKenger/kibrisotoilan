@@ -39,27 +39,31 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
 
   BodyType? _selectedBodyType;
 
-  String? _selectedColor;
+    String? _selectedColor;
 
-  int? _minYear;
+    int? _minYear;
 
-  int? _maxYear;
+    int? _maxYear;
 
-  int? _maxMileage;
+    int? _minMileage;
 
+    int? _maxMileage;
 
+  
 
-  @override
+    @override
 
-  void initState() {
+    void initState() {
 
-    super.initState();
+      super.initState();
 
-    _selectedBrand = widget.initialBrand;
+      _selectedBrand = widget.initialBrand;
 
-    _selectedModel = widget.initialModel;
+      _selectedModel = widget.initialModel;
 
-  }
+    }
+
+  
 
 
 
@@ -212,13 +216,30 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildDropdown<int>(
-                    label: 'Maksimum KM',
-                    value: _maxMileage,
-                    items: [10000, 30000, 50000, 100000, 150000, 200000, 300000]
-                        .map((e) => DropdownMenuItem(value: e, child: Text('${e.toString()} KM Altı'))).toList(),
-                    onChanged: (v) => setState(() => _maxMileage = v),
-                    icon: Icons.speed_outlined,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildDropdown<int>(
+                          label: 'Minimum KM',
+                          value: _minMileage,
+                          items: [0, 10000, 30000, 50000, 100000, 150000, 200000]
+                              .map((e) => DropdownMenuItem(value: e, child: Text('${e.toString()} KM'))).toList(),
+                          onChanged: (v) => setState(() => _minMileage = v),
+                          icon: Icons.speed_outlined,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildDropdown<int>(
+                          label: 'Maksimum KM',
+                          value: _maxMileage,
+                          items: [10000, 30000, 50000, 100000, 150000, 200000, 300000, 500000]
+                              .map((e) => DropdownMenuItem(value: e, child: Text('${e.toString()} KM'))).toList(),
+                          onChanged: (v) => setState(() => _maxMileage = v),
+                          icon: Icons.speed_outlined,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 32),
                 ],
@@ -290,6 +311,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
       _selectedColor = null;
       _minYear = null;
       _maxYear = null;
+      _minMileage = null;
       _maxMileage = null;
     });
   }
@@ -305,6 +327,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
       color: _selectedColor,
       minYear: _minYear,
       maxYear: _maxYear,
+      minMileage: _minMileage,
       maxMileage: _maxMileage,
       page: 1,
       limit: 20,

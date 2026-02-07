@@ -50,5 +50,11 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Araç ruhsatını taramak ve ilan fotoğrafları çekmek için kamera izni gereklidir.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>İlan için galerinizden fotoğraf seçebilmeniz için galeri izni gereklidir.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Video çekimi yapabilmek için mikrofon izni gereklidir.</string>
 </dict>
 </plist>

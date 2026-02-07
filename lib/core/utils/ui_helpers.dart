@@ -88,15 +88,52 @@ class UIHelpers {
     return mileage.toString();
   }
 
-  static String translateFuelType(String? fuelType) {
-    if (fuelType == null || fuelType.isEmpty) return 'Bilinmiyor';
-    switch (fuelType.toLowerCase()) {
-      case 'gasoline': return 'Benzin';
-      case 'diesel': return 'Dizel';
-      case 'electric': return 'Elektrik';
-      case 'hybrid': return 'Hibrit';
-      case 'lpg': return 'LPG';
-      default: return fuelType;
+    static String translateFuelType(String? fuelType) {
+
+      if (fuelType == null || fuelType.isEmpty) return 'Bilinmiyor';
+
+      switch (fuelType.toLowerCase()) {
+
+        case 'gasoline': return 'Benzin';
+
+        case 'diesel': return 'Dizel';
+
+        case 'electric': return 'Elektrik';
+
+        case 'hybrid': return 'Hibrit';
+
+        case 'lpg': return 'LPG';
+
+        default: return fuelType;
+
+      }
+
     }
+
+  
+
+    static String translateBodyType(BodyType bodyType) {
+
+      switch (bodyType) {
+
+        case BodyType.sedan: return 'Sedan';
+
+        case BodyType.hatchback: return 'Hatchback';
+
+        case BodyType.suv: return 'SUV';
+
+        case BodyType.coupe: return 'Coupe';
+
+        case BodyType.convertible: return 'Cabrio';
+
+        case BodyType.van: return 'Panelvan';
+
+        case BodyType.pickup: return 'Pickup';
+
+      }
+
+    }
+
   }
-}
+
+  

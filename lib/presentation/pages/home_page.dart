@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/theme/app_colors.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../domain/entities/brand_entity.dart';
+import '../../core/utils/ui_helpers.dart';
 import '../bloc/auth/auth_bloc.dart';
 import '../bloc/auth/auth_state.dart';
 import '../bloc/car/car_bloc.dart';
@@ -22,121 +23,135 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   BrandEntity? _selectedBrandEntity;
-  String? _selectedBrand;
-  String? _selectedModel;
+  SeriesModels? _selectedSeriesEntity;
+  String? _selectedModelName;
+  
   List<SeriesModels> _currentSeriesList = [];
+  List<String> _currentModelList = [];
+  
+  // Keep internal state but remove the UI toggle as requested
+  final DisplayCurrency _displayCurrency = DisplayCurrency.gbp;
 
   @override
   void initState() {
     super.initState();
-    _checkAndFetch();
+    _initialFetch();
   }
 
-  void _checkAndFetch() {
-    final carBloc = context.read<CarBloc>();
-    if (carBloc.state is CarInitial || carBloc.state is CarError) {
-      _fetchCars();
-      carBloc.add(const GetAllBrandsEvent());
+  void _initialFetch() {
+    context.read<CarBloc>().add(const GetAllBrandsEvent());
+    _applyAllFilters();
+  }
+
+  void _applyAllFilters() {
+    if (!mounted) return;
+    
+    String? modelSearchTerm;
+    if (_selectedModelName != null) {
+      modelSearchTerm = "${_selectedSeriesEntity?.series} $_selectedModelName";
+    } else if (_selectedSeriesEntity != null) {
+      modelSearchTerm = _selectedSeriesEntity!.series;
     }
+
+    context.read<CarBloc>().add(GetCarsEvent(
+      brand: _selectedBrandEntity?.name,
+      model: modelSearchTerm,
+      page: 1,
+      limit: 20,
+      sortBy: 'created_at',
+      sortOrder: 'desc',
+    ));
   }
 
   void _onBrandTap(BrandEntity brand) {
-    if (_selectedBrand == brand.name) {
-      _resetBrandFilter();
+    if (_selectedBrandEntity?.id == brand.id) {
+      _resetAll();
     } else {
       setState(() {
         _selectedBrandEntity = brand;
-        _selectedBrand = brand.name;
-        _selectedModel = null;
+        _selectedSeriesEntity = null;
+        _selectedModelName = null;
         _currentSeriesList = [];
+        _currentModelList = [];
       });
       context.read<CarBloc>().add(GetSeriesAndModelsEvent(brandId: brand.id));
-      _fetchCars(brand: brand.name);
+      _applyAllFilters();
     }
   }
 
-  void _resetBrandFilter() {
+  void _onSeriesTap(SeriesModels series) {
+    if (_selectedSeriesEntity?.id == series.id) {
+      setState(() {
+        _selectedSeriesEntity = null;
+        _selectedModelName = null;
+        _currentModelList = [];
+      });
+    } else {
+      setState(() {
+        _selectedSeriesEntity = series;
+        _currentModelList = series.models;
+        _selectedModelName = null;
+      });
+    }
+    _applyAllFilters();
+  }
+
+  void _onModelTap(String modelName) {
+    setState(() {
+      if (_selectedModelName == modelName) {
+        _selectedModelName = null;
+      } else {
+        _selectedModelName = modelName;
+      }
+    });
+    _applyAllFilters();
+  }
+
+  void _resetAll() {
     setState(() {
       _selectedBrandEntity = null;
-      _selectedBrand = null;
-      _selectedModel = null;
+      _selectedSeriesEntity = null;
+      _selectedModelName = null;
       _currentSeriesList = [];
+      _currentModelList = [];
     });
-    _fetchCars(brand: null);
-  }
-
-  void _onSeriesTap(String seriesName) {
-    setState(() {
-      _selectedModel = seriesName;
-    });
-    _fetchCarsWithSeries(_selectedBrand!, seriesName);
-  }
-
-  void _fetchCarsWithSeries(String brand, String series) {
-    if (!mounted) return;
-    setState(() {
-      _selectedBrand = brand;
-      _selectedModel = series;
-    });
-    context.read<CarBloc>().add(GetCarsEvent(
-      brand: brand,
-      model: series,
-      page: 1,
-      limit: 20,
-      sortBy: 'created_at',
-      sortOrder: 'desc',
-    ));
-  }
-
-  void _fetchCars({String? brand}) {
-    if (!mounted) return;
-    setState(() {
-      _selectedBrand = brand;
-      if (brand == null) _selectedModel = null;
-    });
-    context.read<CarBloc>().add(GetCarsEvent(
-      brand: brand,
-      model: _selectedModel,
-      page: 1,
-      limit: 20,
-      sortBy: 'created_at',
-      sortOrder: 'desc',
-    ));
+    _applyAllFilters();
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
-        if (state is Authenticated) {
-          _fetchCars(brand: _selectedBrand);
-        }
+        if (state is Authenticated) _applyAllFilters();
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: RefreshIndicator(
           onRefresh: () async {
-            _fetchCars(brand: _selectedBrand);
+            _applyAllFilters();
           },
           color: AppColors.primary,
-          backgroundColor: AppColors.surface,
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
             slivers: [
-              _buildSliverAppBar(),
+              _buildAppBar(),
               SliverToBoxAdapter(child: _buildSearchBar()),
               SliverToBoxAdapter(child: _buildQuickTools()),
+              
               SliverToBoxAdapter(
                 child: _buildSectionHeader(
                   title: 'Popüler Markalar', 
-                  onSeeAll: () => _resetBrandFilter()
+                  actionLabel: 'Sıfırla',
+                  onAction: _resetAll,
                 )
               ),
-              SliverToBoxAdapter(child: _buildBrandList()),
+              SliverToBoxAdapter(child: _buildBrandSelectionArea()),
+
               SliverToBoxAdapter(
                 child: _buildSectionHeader(
-                  title: _selectedBrand == null ? 'Son Eklenen İlanlar' : '$_selectedBrand İlanları', 
-                  onSeeAll: () {}
+                  title: _selectedBrandEntity == null ? 'Son İlanlar' : '${_selectedBrandEntity!.name} İlanları', 
+                  actionLabel: 'Tümü',
+                  onAction: () {},
                 )
               ),
               _buildCarGrid(),
@@ -148,145 +163,48 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSliverAppBar() {
+  Widget _buildAppBar() {
     return SliverAppBar(
-      expandedHeight: 80.0,
-      floating: true,
-      pinned: false,
+      pinned: true,
+      expandedHeight: 70,
       backgroundColor: AppColors.background,
       elevation: 0,
-      automaticallyImplyLeading: false,
-      flexibleSpace: FlexibleSpaceBar(
-        titlePadding: const EdgeInsets.symmetric(horizontal: 20),
-        centerTitle: false,
-        title: Row(
-          children: [
-            const Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Merhaba,', style: TextStyle(fontSize: 14, color: AppColors.textHint, fontWeight: FontWeight.w400)),
-                Text('Kıbrıs Oto İlan', style: TextStyle(fontSize: 20, color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const Spacer(),
-            Container(
-              decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle, border: Border.all(color: Colors.white10)),
-              child: IconButton(
-                icon: const Icon(Icons.notifications_outlined, color: AppColors.textPrimary),
-                onPressed: () {},
-              ),
-            ),
-          ],
+      title: const Text('Kıbrıs Oto İlan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 15),
+          decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle, border: Border.all(color: Colors.white10)),
+          child: IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: AppColors.textPrimary, size: 20),
+            onPressed: () {},
+          ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-      child: Material(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (context) => FilterBottomSheet(
-                initialBrand: _selectedBrand,
-                initialModel: _selectedModel,
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.05)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.search, color: AppColors.primary, size: 28),
-                SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Hayalindeki aracı bul...', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
-                    Text('Marka, model veya yıl ara', style: TextStyle(color: AppColors.textHint, fontSize: 12)),
-                  ],
-                ),
-              ],
-            ),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+      child: InkWell(
+        onTap: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => FilterBottomSheet(
+            initialBrand: _selectedBrandEntity?.name,
+            initialModel: _selectedModelName ?? _selectedSeriesEntity?.series,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildQuickTools() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Text('Hızlı Araçlar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          ),
-          SizedBox(
-            height: 50,
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              children: [
-                _buildToolButton(
-                  icon: Icons.calculate_outlined,
-                  label: 'Devir Hesapla',
-                  onTap: () => _showDevirHesaplaOptions(),
-                ),
-                const SizedBox(width: 12),
-                _buildToolButton(
-                  icon: Icons.history_edu_outlined,
-                  label: 'Hasar Sorgula',
-                  onTap: () {},
-                ),
-                const SizedBox(width: 12),
-                _buildToolButton(
-                  icon: Icons.gavel_outlined,
-                  label: 'Gümrük Harcı',
-                  onTap: () {},
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToolButton({required IconData icon, required String label, required VoidCallback onTap}) {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
-          ),
-          child: Row(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
+          child: const Row(
             children: [
-              Icon(icon, color: AppColors.primary, size: 20),
-              const SizedBox(width: 8),
-              Text(label, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 13)),
+              Icon(Icons.search, color: AppColors.primary),
+              SizedBox(width: 12),
+              Text('Detaylı Ara...', style: TextStyle(color: AppColors.textHint)),
             ],
           ),
         ),
@@ -294,31 +212,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _showDevirHesaplaOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const DevirHesaplaOptionsSheet(),
-    );
-  }
-
-  Widget _buildSectionHeader({required String title, required VoidCallback onSeeAll}) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          TextButton(
-            onPressed: onSeeAll, 
-            child: Text(title == 'Popüler Markalar' ? 'Temizle' : 'Tümü', style: const TextStyle(color: AppColors.primary))
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBrandList() {
+  Widget _buildBrandSelectionArea() {
     return BlocListener<CarBloc, CarState>(
       listener: (context, state) {
         if (state is SeriesAndModelsLoaded) {
@@ -326,80 +220,59 @@ class _HomePageState extends State<HomePage> {
         }
       },
       child: BlocBuilder<CarBloc, CarState>(
-        buildWhen: (previous, current) => current is AllBrandsLoaded,
+        buildWhen: (prev, curr) => curr is AllBrandsLoaded,
         builder: (context, state) {
           List<BrandEntity> brands = [];
-          if (state is AllBrandsLoaded) {
-            brands = state.brands;
-          }
+          if (state is AllBrandsLoaded) brands = state.brands;
 
           return AnimatedSwitcher(
             duration: const Duration(milliseconds: 400),
-            transitionBuilder: (Widget child, Animation<double> animation) {
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0.1, 0),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              );
-            },
-            child: _buildAnimatedContent(brands),
+            child: _buildSelectionContent(brands),
           );
         },
       ),
     );
   }
 
-  Widget _buildAnimatedContent(List<BrandEntity> brands) {
+  Widget _buildSelectionContent(List<BrandEntity> brands) {
     if (_selectedBrandEntity != null) {
-      // Focused View: Selected Brand + Series
       return SizedBox(
-        key: const ValueKey('focused_view'),
+        key: ValueKey('sel_${_selectedBrandEntity!.id}_${_selectedSeriesEntity?.id}_$_selectedModelName'),
         height: 100,
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
           scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           children: [
-            _buildBrandItem(_selectedBrandEntity!, isSelected: true, onTap: () => _resetBrandFilter()),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 15),
-              width: 1, height: 40, color: Colors.white10,
-            ),
-            ..._currentSeriesList.map((s) => _buildSeriesItem(s.series, isSelected: _selectedModel == s.series)),
+            _buildCircleItem(image: _selectedBrandEntity!.logoUrl, label: _selectedBrandEntity!.name, isSelected: true, onTap: _resetAll),
+            const VerticalDivider(width: 30, color: Colors.white10, indent: 20, endIndent: 20),
+            if (_selectedSeriesEntity == null)
+              ..._currentSeriesList.map((s) => _buildCircleItem(label: s.series, onTap: () => _onSeriesTap(s)))
+            else ...[
+              _buildCircleItem(label: _selectedSeriesEntity!.series, isSelected: true, onTap: () => setState(() => _selectedSeriesEntity = null)),
+              const VerticalDivider(width: 30, color: Colors.white10, indent: 20, endIndent: 20),
+              ..._currentModelList.map((m) => _buildCircleItem(label: m, isSelected: _selectedModelName == m, onTap: () => _onModelTap(m))),
+            ]
           ],
         ),
       );
     }
 
-    if (brands.isEmpty) {
-      return const SizedBox(
-        key: ValueKey('loading_view'),
-        height: 100,
-        child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
-      );
-    }
+    if (brands.isEmpty) return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
 
-    // Default view: All brands
     return SizedBox(
-      key: const ValueKey('all_brands_view'),
+      key: const ValueKey('all_brands'),
       height: 100,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
         itemCount: brands.length,
         separatorBuilder: (_, __) => const SizedBox(width: 15),
-        itemBuilder: (context, index) => _buildBrandItem(brands[index], isSelected: false, onTap: () => _onBrandTap(brands[index])),
+        itemBuilder: (context, index) => _buildCircleItem(image: brands[index].logoUrl, label: brands[index].name, onTap: () => _onBrandTap(brands[index])),
       ),
     );
   }
 
-  Widget _buildBrandItem(BrandEntity brand, {required bool isSelected, required VoidCallback onTap}) {
+  Widget _buildCircleItem({String? image, required String label, bool isSelected = false, required VoidCallback onTap}) {
     return Column(
       children: [
         InkWell(
@@ -409,123 +282,98 @@ class _HomePageState extends State<HomePage> {
             width: 60, height: 60,
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary : Colors.white,
+              color: isSelected ? AppColors.primary : (image != null ? Colors.white : AppColors.surface),
               shape: BoxShape.circle,
               border: Border.all(color: isSelected ? AppColors.primary : Colors.white10, width: 2),
             ),
-            child: brand.logoUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: brand.logoUrl!,
-                    errorWidget: (context, url, error) => Icon(_getBrandIcon(brand.name), color: Colors.black54, size: 30),
-                    fit: BoxFit.contain,
-                  )
-                : Icon(_getBrandIcon(brand.name), color: Colors.black, size: 30),
+            child: image != null
+                ? CachedNetworkImage(imageUrl: image, fit: BoxFit.contain, errorWidget: (c,u,e) => const Icon(Icons.directions_car))
+                : Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Text(
+                        label, 
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isSelected ? Colors.black : Colors.white, 
+                          fontSize: label.length > 10 ? 8 : 10, 
+                          fontWeight: FontWeight.bold
+                        ),
+                      ),
+                    )
+                  ),
           ),
         ),
-        const SizedBox(height: 8),
-        Text(brand.name, style: TextStyle(color: isSelected ? AppColors.primary : AppColors.textHint, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500)),
+        // Sadece markalar (resimli olanlar) için alt yazı göster
+        if (image != null) ...[
+          const SizedBox(height: 8),
+          Text(label, style: TextStyle(color: isSelected ? AppColors.primary : AppColors.textHint, fontSize: 11)),
+        ],
       ],
     );
   }
 
-  Widget _buildSeriesItem(String name, {required bool isSelected}) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 15),
-      child: Column(
+  Widget _buildQuickTools() {
+    return SizedBox(
+      height: 50,
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        scrollDirection: Axis.horizontal,
         children: [
-          InkWell(
-            onTap: () => _onSeriesTap(name),
-            borderRadius: BorderRadius.circular(30),
-            child: Container(
-              width: 60, height: 60,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : AppColors.surface,
-                shape: BoxShape.circle,
-                border: Border.all(color: isSelected ? AppColors.primary : Colors.white10, width: 1),
-              ),
-              child: Center(
-                child: Text(
-                  name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  style: TextStyle(
-                    color: isSelected ? Colors.black : AppColors.textPrimary,
-                    fontSize: name.length > 8 ? 9 : 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text('Seri', style: TextStyle(color: Colors.transparent, fontSize: 12)),
+          _buildToolBtn('Devir Hesapla', Icons.calculate_outlined, () => showModalBottomSheet(context: context, builder: (context) => const DevirHesaplaOptionsSheet())),
+          const SizedBox(width: 12),
+          _buildToolBtn('Hasar Sorgula', Icons.history_edu_outlined, () {}),
         ],
       ),
     );
   }
 
-  IconData _getBrandIcon(String brandName) {
-    switch (brandName.toLowerCase()) {
-      case 'bmw': return Icons.directions_car;
-      case 'mercedes-benz': return Icons.stars;
-      case 'audi': return Icons.incomplete_circle;
-      case 'toyota': return Icons.airport_shuttle;
-      case 'honda': return Icons.local_taxi;
-      case 'ford': return Icons.commute;
-      case 'tesla': return Icons.electric_car;
-      default: return Icons.directions_car_filled_outlined;
-    }
+  Widget _buildToolBtn(String label, IconData icon, VoidCallback onTap) {
+    return ActionChip(
+      onPressed: onTap,
+      backgroundColor: AppColors.surface,
+      label: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+      avatar: Icon(icon, color: AppColors.primary, size: 18),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
+
+  Widget _buildSectionHeader({required String title, required VoidCallback onAction, required String actionLabel}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis)),
+          TextButton(onPressed: onAction, child: Text(actionLabel, style: const TextStyle(color: AppColors.primary))),
+        ],
+      ),
+    );
   }
 
   Widget _buildCarGrid() {
     return BlocBuilder<CarBloc, CarState>(
-      buildWhen: (previous, current) => 
-          current is CarsLoaded || current is CarLoading || current is CarInitial || current is CarError,
+      buildWhen: (prev, curr) => curr is CarsLoaded || curr is CarLoading || curr is CarError,
       builder: (context, state) {
-        if (state is CarInitial || state is CarLoading) {
-          return const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: AppColors.primary)));
-        } else if (state is CarError) {
-          return SliverFillRemaining(
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, color: AppColors.error, size: 48),
-                  const SizedBox(height: 16),
-                  Text(state.message, style: const TextStyle(color: AppColors.textHint)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(onPressed: () => _fetchCars(brand: _selectedBrand), child: const Text('Tekrar Dene')),
-                ],
-              ),
-            ),
-          );
-        } else if (state is CarsLoaded) {
-          if (state.cars.isEmpty) {
-            return const SliverFillRemaining(child: Center(child: Text('İlan bulunamadı.', style: TextStyle(color: AppColors.textHint))));
-          }
+        if (state is CarLoading) return const SliverFillRemaining(child: Center(child: CircularProgressIndicator()));
+        if (state is CarError) return SliverFillRemaining(child: Center(child: Text(state.message)));
+        if (state is CarsLoaded) {
+          if (state.cars.isEmpty) return const SliverFillRemaining(child: Center(child: Text('İlan bulunamadı.')));
           return SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.70,
-                crossAxisSpacing: 15,
-                mainAxisSpacing: 15,
+                crossAxisCount: 2, 
+                childAspectRatio: 0.7, 
+                crossAxisSpacing: 15, 
+                mainAxisSpacing: 15
               ),
               delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final car = state.cars[index];
-                  return CarCard(
-                    car: car,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => CarDetailPage(car: car)),
-                      );
-                    },
-                  );
-                },
+                (context, index) => CarCard(
+                  car: state.cars[index],
+                  displayCurrency: _displayCurrency,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => CarDetailPage(car: state.cars[index]))),
+                ),
                 childCount: state.cars.length,
               ),
             ),
