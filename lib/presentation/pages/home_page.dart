@@ -9,6 +9,9 @@ import '../bloc/auth/auth_state.dart';
 import '../bloc/car/car_bloc.dart';
 import '../bloc/car/car_event.dart';
 import '../bloc/car/car_state.dart';
+import '../bloc/theme/theme_bloc.dart';
+import '../bloc/theme/theme_event.dart';
+import '../bloc/theme/theme_state.dart';
 import '../widgets/home/car_card.dart';
 import '../widgets/home/filter_bottom_sheet.dart';
 import '../widgets/tools/devir_hesapla_sheet.dart';
@@ -28,6 +31,9 @@ class _HomePageState extends State<HomePage> {
   
   List<SeriesModels> _currentSeriesList = [];
   List<String> _currentModelList = [];
+
+  String _sortBy = 'created_at';
+  String _sortOrder = 'desc';
   
   // Keep internal state but remove the UI toggle as requested
   final DisplayCurrency _displayCurrency = DisplayCurrency.gbp;
@@ -58,14 +64,23 @@ class _HomePageState extends State<HomePage> {
       model: modelSearchTerm,
       page: 1,
       limit: 20,
-      sortBy: 'created_at',
-      sortOrder: 'desc',
+      sortBy: _sortBy,
+      sortOrder: _sortOrder,
     ));
   }
 
   void _onBrandTap(BrandEntity brand) {
     if (_selectedBrandEntity?.id == brand.id) {
-      _resetAll();
+      // Don't use _resetAll here to avoid resetting search terms or other things if needed, 
+      // but for brand selection, we just want to deselect.
+      setState(() {
+        _selectedBrandEntity = null;
+        _selectedSeriesEntity = null;
+        _selectedModelName = null;
+        _currentSeriesList = [];
+        _currentModelList = [];
+      });
+      _applyAllFilters();
     } else {
       setState(() {
         _selectedBrandEntity = brand;
@@ -114,6 +129,8 @@ class _HomePageState extends State<HomePage> {
       _selectedModelName = null;
       _currentSeriesList = [];
       _currentModelList = [];
+      _sortBy = 'created_at';
+      _sortOrder = 'desc';
     });
     _applyAllFilters();
   }
@@ -125,7 +142,6 @@ class _HomePageState extends State<HomePage> {
         if (state is Authenticated) _applyAllFilters();
       },
       child: Scaffold(
-        backgroundColor: AppColors.background,
         body: RefreshIndicator(
           onRefresh: () async {
             _applyAllFilters();
@@ -150,8 +166,8 @@ class _HomePageState extends State<HomePage> {
               SliverToBoxAdapter(
                 child: _buildSectionHeader(
                   title: _selectedBrandEntity == null ? 'Son İlanlar' : '${_selectedBrandEntity!.name} İlanları', 
-                  actionLabel: 'Tümü',
-                  onAction: () {},
+                  actionLabel: 'Sıralama',
+                  onAction: _showSortOptions,
                 )
               ),
               _buildCarGrid(),
@@ -163,19 +179,70 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  void _showSortOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 12),
+          const Text('Sıralama Seçenekleri', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 8),
+          _buildSortItem('En Yeniler', 'created_at', 'desc'),
+          _buildSortItem('Fiyat: Düşükten Yükseğe', 'price', 'asc'),
+          _buildSortItem('Fiyat: Yüksekten Düşüğe', 'price', 'desc'),
+          _buildSortItem('Kilometre: Düşükten Yükseğe', 'mileage', 'asc'),
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortItem(String label, String sortBy, String sortOrder) {
+    final isSelected = _sortBy == sortBy && _sortOrder == sortOrder;
+    return ListTile(
+      title: Text(label, style: TextStyle(color: isSelected ? AppColors.primary : null, fontWeight: isSelected ? FontWeight.bold : null)),
+      trailing: isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+      onTap: () {
+        setState(() {
+          _sortBy = sortBy;
+          _sortOrder = sortOrder;
+        });
+        Navigator.pop(context);
+        _applyAllFilters();
+      },
+    );
+  }
+
   Widget _buildAppBar() {
     return SliverAppBar(
       pinned: true,
       expandedHeight: 70,
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       elevation: 0,
       title: const Text('Kıbrıs Oto İlan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
       actions: [
+        BlocBuilder<ThemeBloc, ThemeState>(
+          builder: (context, state) {
+            return Container(
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(color: Theme.of(context).cardColor, shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.05))),
+              child: IconButton(
+                icon: Icon(state.themeMode == ThemeMode.dark ? Icons.light_mode : Icons.dark_mode, size: 20),
+                onPressed: () => context.read<ThemeBloc>().add(ToggleThemeEvent()),
+              ),
+            );
+          },
+        ),
         Container(
           margin: const EdgeInsets.only(right: 15),
-          decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle, border: Border.all(color: Colors.white10)),
+          decoration: BoxDecoration(color: Theme.of(context).cardColor, shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.05))),
           child: IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: AppColors.textPrimary, size: 20),
+            icon: const Icon(Icons.notifications_outlined, size: 20),
             onPressed: () {},
           ),
         ),
@@ -199,12 +266,12 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
+          decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(16)),
           child: const Row(
             children: [
               Icon(Icons.search, color: AppColors.primary),
               SizedBox(width: 12),
-              Text('Detaylı Ara...', style: TextStyle(color: AppColors.textHint)),
+              Text('Hayalindeki özellikleri ara...', style: TextStyle(color: AppColors.textHint)),
             ],
           ),
         ),
@@ -238,17 +305,17 @@ class _HomePageState extends State<HomePage> {
     if (_selectedBrandEntity != null) {
       return SizedBox(
         key: ValueKey('sel_${_selectedBrandEntity!.id}_${_selectedSeriesEntity?.id}_$_selectedModelName'),
-        height: 100,
+        height: 110,
         child: ListView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           children: [
-            _buildCircleItem(image: _selectedBrandEntity!.logoUrl, label: _selectedBrandEntity!.name, isSelected: true, onTap: _resetAll),
+            _buildCircleItem(image: _selectedBrandEntity!.logoUrl, label: _selectedBrandEntity!.name, isSelected: true, onTap: () => _onBrandTap(_selectedBrandEntity!)),
             const VerticalDivider(width: 30, color: Colors.white10, indent: 20, endIndent: 20),
             if (_selectedSeriesEntity == null)
               ..._currentSeriesList.map((s) => _buildCircleItem(label: s.series, onTap: () => _onSeriesTap(s)))
             else ...[
-              _buildCircleItem(label: _selectedSeriesEntity!.series, isSelected: true, onTap: () => setState(() => _selectedSeriesEntity = null)),
+              _buildCircleItem(label: _selectedSeriesEntity!.series, isSelected: true, onTap: () => _onSeriesTap(_selectedSeriesEntity!)),
               const VerticalDivider(width: 30, color: Colors.white10, indent: 20, endIndent: 20),
               ..._currentModelList.map((m) => _buildCircleItem(label: m, isSelected: _selectedModelName == m, onTap: () => _onModelTap(m))),
             ]
@@ -257,11 +324,11 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    if (brands.isEmpty) return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
+    if (brands.isEmpty) return const SizedBox(height: 110, child: Center(child: CircularProgressIndicator()));
 
     return SizedBox(
       key: const ValueKey('all_brands'),
-      height: 100,
+      height: 110,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         scrollDirection: Axis.horizontal,
@@ -273,18 +340,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildCircleItem({String? image, required String label, bool isSelected = false, required VoidCallback onTap}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
         InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(30),
           child: Container(
-            width: 60, height: 60,
+            width: 65, height: 65,
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary : (image != null ? Colors.white : AppColors.surface),
+              color: isSelected ? AppColors.primary : (image != null ? Colors.white : Theme.of(context).cardColor),
               shape: BoxShape.circle,
-              border: Border.all(color: isSelected ? AppColors.primary : Colors.white10, width: 2),
+              border: Border.all(color: isSelected ? AppColors.primary : Colors.black.withOpacity(0.05), width: 2),
+              boxShadow: isDark ? null : [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2))],
             ),
             child: image != null
                 ? CachedNetworkImage(imageUrl: image, fit: BoxFit.contain, errorWidget: (c,u,e) => const Icon(Icons.directions_car))
@@ -295,8 +364,8 @@ class _HomePageState extends State<HomePage> {
                         label, 
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: isSelected ? Colors.black : Colors.white, 
-                          fontSize: label.length > 10 ? 8 : 10, 
+                          color: isSelected ? Colors.black : (isDark ? Colors.white : Colors.black87), 
+                          fontSize: label.length > 10 ? 10 : 12, 
                           fontWeight: FontWeight.bold
                         ),
                       ),
@@ -307,7 +376,7 @@ class _HomePageState extends State<HomePage> {
         // Sadece markalar (resimli olanlar) için alt yazı göster
         if (image != null) ...[
           const SizedBox(height: 8),
-          Text(label, style: TextStyle(color: isSelected ? AppColors.primary : AppColors.textHint, fontSize: 11)),
+          Text(label, style: TextStyle(color: isSelected ? AppColors.primary : AppColors.textHint, fontSize: 11, fontWeight: isSelected ? FontWeight.bold : null)),
         ],
       ],
     );
@@ -331,8 +400,8 @@ class _HomePageState extends State<HomePage> {
   Widget _buildToolBtn(String label, IconData icon, VoidCallback onTap) {
     return ActionChip(
       onPressed: onTap,
-      backgroundColor: AppColors.surface,
-      label: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12)),
+      backgroundColor: Theme.of(context).cardColor,
+      label: Text(label, style: const TextStyle(fontSize: 12)),
       avatar: Icon(icon, color: AppColors.primary, size: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
@@ -344,8 +413,19 @@ class _HomePageState extends State<HomePage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white), overflow: TextOverflow.ellipsis)),
-          TextButton(onPressed: onAction, child: Text(actionLabel, style: const TextStyle(color: AppColors.primary))),
+          Expanded(child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+          TextButton(
+            onPressed: onAction, 
+            child: Row(
+              children: [
+                Text(actionLabel, style: const TextStyle(color: AppColors.primary)),
+                if (actionLabel == 'Sıralama') ...[
+                  const SizedBox(width: 4),
+                  const Icon(Icons.sort, color: AppColors.primary, size: 16),
+                ]
+              ],
+            )
+          ),
         ],
       ),
     );
@@ -364,7 +444,7 @@ class _HomePageState extends State<HomePage> {
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2, 
-                childAspectRatio: 0.7, 
+                childAspectRatio: 0.68, 
                 crossAxisSpacing: 15, 
                 mainAxisSpacing: 15
               ),

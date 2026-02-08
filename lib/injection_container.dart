@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Core
 import 'core/config/env_config.dart';
@@ -45,6 +46,7 @@ import 'domain/usecases/get_models_by_brand_usecase.dart'; // Yeni
 import 'presentation/bloc/car/car_bloc.dart';
 import 'presentation/bloc/auth/auth_bloc.dart';
 import 'presentation/bloc/user/user_bloc.dart';
+import 'presentation/bloc/theme/theme_bloc.dart';
 
 final sl = GetIt.instance;
 
@@ -59,8 +61,9 @@ void resetUnauthorizedFlag() {
   _unauthorizedFired = false;
 }
 
-Future<void> init() async {
+Future<void> init({required SharedPreferences sharedPreferences}) async {
   // External
+  sl.registerLazySingleton<SharedPreferences>(() => sharedPreferences);
   const secureStorage = FlutterSecureStorage();
   sl.registerLazySingleton<FlutterSecureStorage>(() => secureStorage);
 
@@ -168,4 +171,5 @@ Future<void> init() async {
         getMyListingsUseCase: sl(),
         softDeleteUserUseCase: sl(), // New
       ));
+  sl.registerFactory(() => ThemeBloc(sharedPreferences: sl()));
 }

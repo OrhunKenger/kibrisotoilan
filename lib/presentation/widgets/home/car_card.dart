@@ -166,150 +166,396 @@ class CarCard extends StatelessWidget {
 
             
 
-            // Bilgi Alanı
+                        // Bilgi Alanı
 
-            Expanded(
+            
 
-              flex: 4,
+                        Expanded(
 
-              child: Padding(
+            
 
-                padding: const EdgeInsets.all(12),
+                          flex: 4,
 
-                child: Column(
+            
 
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Padding(
 
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            
 
-                  children: [
+                            padding: const EdgeInsets.all(12),
 
-                    Column(
+            
 
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Column(
 
-                      children: [
+            
 
-                        Text(
+                              crossAxisAlignment: CrossAxisAlignment.start,
 
-                          '${car.brand} ${car.model}',
+            
 
-                          maxLines: 1,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
-                          overflow: TextOverflow.ellipsis,
+            
 
-                          style: const TextStyle(
+                              children: [
 
-                            fontSize: 14,
+            
 
-                            fontWeight: FontWeight.bold,
+                                Column(
 
-                            color: AppColors.textPrimary,
+            
 
-                          ),
+                                  crossAxisAlignment: CrossAxisAlignment.start,
 
-                        ),
+            
 
-                        const SizedBox(height: 4),
+                                  children: [
 
-                        Text(
+            
 
-                          car.title,
+                                    Text(
 
-                          maxLines: 1,
+            
 
-                          overflow: TextOverflow.ellipsis,
+                                      '${car.brand} ${car.model}',
 
-                          style: const TextStyle(
+            
 
-                            fontSize: 11,
+                                      maxLines: 1,
 
-                            color: AppColors.textHint,
+            
 
-                          ),
+                                      overflow: TextOverflow.ellipsis,
 
-                        ),
+            
 
-                      ],
+                                      style: const TextStyle(
 
-                    ),
+            
 
-                    
+                                        fontSize: 14,
 
-                    Column(
+            
 
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                                        fontWeight: FontWeight.bold,
 
-                      children: [
+            
 
-                        Text(
+                                      ),
 
-                          UIHelpers.formatPriceWithConversion(
+            
 
-                            car.price,
+                                    ),
 
-                            originalCurrency: car.currency,
+            
 
-                            displayCurrency: displayCurrency,
+                                    const SizedBox(height: 2),
 
-                            gbpToTryRate: car.exchangeRates?.gbpToTry,
+            
 
-                          ),
+                                    Text(
 
-                          style: const TextStyle(
+            
 
-                            fontSize: 15,
+                                      car.title,
 
-                            fontWeight: FontWeight.bold,
+            
 
-                            color: AppColors.primary,
+                                      maxLines: 1,
 
-                          ),
+            
 
-                        ),
+                                      overflow: TextOverflow.ellipsis,
 
-                        const SizedBox(height: 4),
+            
 
-                        Row(
+                                      style: TextStyle(
 
-                          children: [
+            
 
-                            const Icon(Icons.location_on_outlined, size: 12, color: AppColors.textHint),
+                                        fontSize: 10,
 
-                            const SizedBox(width: 2),
+            
 
-                            Text(
+                                        color: Theme.of(context).hintColor,
 
-                              car.city,
+            
 
-                              style: const TextStyle(fontSize: 10, color: AppColors.textHint),
+                                      ),
+
+            
+
+                                    ),
+
+            
+
+                                    const SizedBox(height: 4),
+
+            
+
+                                    Row(
+
+            
+
+                                      children: [
+
+            
+
+                                        _buildInfoBadge(context, UIHelpers.translateTransmission(car.transmission)),
+
+            
+
+                                        const SizedBox(width: 4),
+
+            
+
+                                        _buildInfoBadge(context, '${UIHelpers.formatMileage(car.mileage)} ${car.mileageUnit.name.toUpperCase()}'),
+
+            
+
+                                      ],
+
+            
+
+                                    ),
+
+            
+
+                                  ],
+
+            
+
+                                ),
+
+            
+
+                                
+
+            
+
+                                Column(
+
+            
+
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+
+            
+
+                                  children: [
+
+            
+
+                                    Text(
+
+            
+
+                                      UIHelpers.formatPriceWithConversion(
+
+            
+
+                                        car.price,
+
+            
+
+                                        originalCurrency: car.currency,
+
+            
+
+                                        displayCurrency: displayCurrency,
+
+            
+
+                                        gbpToTryRate: car.exchangeRates?.gbpToTry,
+
+            
+
+                                      ),
+
+            
+
+                                      style: const TextStyle(
+
+            
+
+                                        fontSize: 15,
+
+            
+
+                                        fontWeight: FontWeight.bold,
+
+            
+
+                                        color: AppColors.primary,
+
+            
+
+                                      ),
+
+            
+
+                                    ),
+
+            
+
+                                    const SizedBox(height: 4),
+
+            
+
+                                    Row(
+
+            
+
+                                      children: [
+
+            
+
+                                        Icon(Icons.location_on_outlined, size: 12, color: Theme.of(context).hintColor),
+
+            
+
+                                        const SizedBox(width: 2),
+
+            
+
+                                        Text(
+
+            
+
+                                          car.city,
+
+            
+
+                                          style: TextStyle(fontSize: 10, color: Theme.of(context).hintColor),
+
+            
+
+                                        ),
+
+            
+
+                                      ],
+
+            
+
+                                    ),
+
+            
+
+                                  ],
+
+            
+
+                                ),
+
+            
+
+                              ],
+
+            
 
                             ),
 
-                          ],
+            
+
+                          ),
+
+            
 
                         ),
 
+            
+
                       ],
+
+            
 
                     ),
 
-                  ],
+            
 
-                ),
+                  ),
 
-              ),
+            
 
-            ),
+                );
 
-          ],
+            
 
-        ),
+              }
 
-      ),
+            
 
-    );
+            
 
-  }
+            
 
-}
+              Widget _buildInfoBadge(BuildContext context, String text) {
+
+            
+
+                return Container(
+
+            
+
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+
+            
+
+                  decoration: BoxDecoration(
+
+            
+
+                    color: AppColors.primary.withOpacity(0.1),
+
+            
+
+                    borderRadius: BorderRadius.circular(4),
+
+            
+
+                  ),
+
+            
+
+                  child: Text(
+
+            
+
+                    text,
+
+            
+
+                    style: const TextStyle(
+
+            
+
+                      fontSize: 8,
+
+            
+
+                      color: AppColors.primary,
+
+            
+
+                      fontWeight: FontWeight.bold,
+
+            
+
+                    ),
+
+            
+
+                  ),
+
+            
+
+                );
+
+            
+
+              }
+
+            
+
+            }

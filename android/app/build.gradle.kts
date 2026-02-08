@@ -24,7 +24,7 @@ android {
         applicationId = "com.example.mobile"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        minSdk = 21
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -37,6 +37,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+    implementation("com.google.mlkit:image-labeling:17.0.7")
+    implementation("com.google.android.gms:play-services-mlkit-image-labeling:16.0.8")
 }
 
 flutter {

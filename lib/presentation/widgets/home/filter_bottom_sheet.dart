@@ -75,59 +75,111 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
 
 
 
-    return Container(
+        return Container(
 
-      height: MediaQuery.of(context).size.height * 0.85,
 
-      decoration: const BoxDecoration(
 
-        color: AppColors.background,
+          height: MediaQuery.of(context).size.height * 0.85,
 
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
 
-      ),
 
-      padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
 
-      child: Column(
 
-        crossAxisAlignment: CrossAxisAlignment.start,
 
-        children: [
+            color: Theme.of(context).scaffoldBackgroundColor,
 
-          Center(
 
-            child: Container(
 
-              width: 40, height: 4,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
 
-              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
 
-            ),
 
           ),
 
-          const SizedBox(height: 24),
 
-          Row(
 
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          padding: const EdgeInsets.all(24),
+
+
+
+          child: Column(
+
+
+
+            crossAxisAlignment: CrossAxisAlignment.start,
+
+
 
             children: [
 
-              const Text('Filtreleme', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
 
-              TextButton(
 
-                onPressed: _resetFilters,
+              Center(
 
-                child: const Text('Temizle', style: TextStyle(color: AppColors.primary)),
+
+
+                child: Container(
+
+
+
+                  width: 40, height: 4,
+
+
+
+                  decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)),
+
+
+
+                ),
+
+
 
               ),
 
-            ],
 
-          ),
+
+              const SizedBox(height: 24),
+
+
+
+              Row(
+
+
+
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+
+
+                children: [
+
+
+
+                  const Text('Filtreleme', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+
+
+
+                  TextButton(
+
+
+
+                    onPressed: _resetFilters,
+
+
+
+                    child: const Text('Temizle', style: TextStyle(color: AppColors.primary)),
+
+
+
+                  ),
+
+
+
+                ],
+
+
+
+              ),
 
           const SizedBox(height: 16),
 

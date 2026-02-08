@@ -6,10 +6,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:get_it/get_it.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
+import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 
 import '../../data/models/lookup_model.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
 import '../../core/services/lookup_service.dart';
 import '../../domain/entities/car_entity.dart';
 import '../../domain/entities/car_enums.dart';
@@ -29,8 +29,9 @@ class CreateListingPage extends StatefulWidget {
 class _CreateListingPageState extends State<CreateListingPage> {
   final _formKey = GlobalKey<FormState>();
   final _lookupService = GetIt.I<LookupService>();
+  late ImageLabeler _imageLabeler;
 
-  // 3-Step Selection State
+  // Selection States
   BrandEntity? _selectedBrandEntity;
   SeriesModels? _selectedSeriesEntity;
   String? _selectedModelName;
@@ -39,7 +40,7 @@ class _CreateListingPageState extends State<CreateListingPage> {
   List<SeriesModels> _seriesModels = [];
   List<String> _models = [];
 
-  // Form Controllers
+  // Controllers
   final _titleController = TextEditingController();
   final _yearController = TextEditingController();
   final _engineSizeController = TextEditingController();
@@ -48,7 +49,7 @@ class _CreateListingPageState extends State<CreateListingPage> {
   final _descriptionController = TextEditingController();
   final _licenseSeriesController = TextEditingController();
 
-  // Form Selections
+  // Selections
   String? _selectedCity;
   String? _selectedDistrict;
   String? _selectedColor;
@@ -62,260 +63,262 @@ class _CreateListingPageState extends State<CreateListingPage> {
   bool _isExchangeable = false;
 
   final List<XFile> _selectedImages = [];
+  final List<String> _uploadedImageUrls = []; 
   bool _isUploading = false;
+  bool _isGeneratingTitle = false;
+  bool _isGeneratingDesc = false;
+  bool _isTitleGenerated = false;
+  bool _isDescGenerated = false;
+  Map<String, dynamic>? _aiSuggestion; 
 
   @override
   void initState() {
     super.initState();
     _loadInitialData();
+    _initializeImageLabeler();
+  }
+
+  void _initializeImageLabeler() {
+    if (kIsWeb) return;
+    try {
+      _imageLabeler = ImageLabeler(options: ImageLabelerOptions(confidenceThreshold: 0.6));
+    } catch (e) { if (kDebugMode) print(e); }
   }
 
   void _loadInitialData() {
-    final carBloc = context.read<CarBloc>();
-    carBloc.add(const GetAllBrandsEvent());
+    context.read<CarBloc>().add(const GetAllBrandsEvent());
+    _lookupService.loadLookups().then((_) { if (mounted) setState(() {}); });
+  }
+
+  Future<void> _startBackgroundAnalysis(List<XFile> images) async {
+    try {
+      final dio = di.sl<Dio>();
+      final formData = FormData();
+      for (final image in images) {
+        final bytes = await image.readAsBytes();
+        formData.files.add(MapEntry('files', MultipartFile.fromBytes(bytes, filename: image.name)));
+      }
+      final response = await dio.post('/upload/images?analyze=true', data: formData);
+      if (response.data is Map && mounted) {
+        setState(() {
+          _aiSuggestion = response.data['ai_suggestion'];
+          if (response.data['urls'] != null) {
+            _uploadedImageUrls.addAll(List<String>.from(response.data['urls']));
+          }
+          _isUploading = false;
+        });
+        if (_aiSuggestion != null) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Yapay Zeka Önerisi Hazır!'), backgroundColor: AppColors.primary));
+        }
+      }
+    } catch (e) { if (mounted) setState(() => _isUploading = false); }
+  }
+
+  bool _checkInfoForAI() {
+    if (_selectedBrandEntity == null || _yearController.text.isEmpty || _selectedColor == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI için önce Marka, Yıl ve Renk bilgilerini girmelisiniz.'), backgroundColor: Colors.orange),
+      );
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _generateAIContent(bool isTitle) async {
+    if (!_checkInfoForAI()) return;
+    if (isTitle && _isTitleGenerated) return;
+    if (!isTitle && _isDescGenerated) return;
+
+    setState(() { if (isTitle) _isGeneratingTitle = true; else _isGeneratingDesc = true; });
     
-    _lookupService.loadLookups().then((_) {
-      if (mounted) setState(() {});
+    try {
+      final dio = di.sl<Dio>();
+      final response = await dio.post('/ai/generate-content', data: {
+        "brand": _selectedBrandEntity!.name,
+        "model": _selectedModelName ?? _selectedSeriesEntity?.series ?? "",
+        "year": int.tryParse(_yearController.text) ?? 2024,
+        "color": _selectedColor ?? "Beyaz"
+      });
+      if (response.data != null) {
+        setState(() {
+          if (isTitle) {
+            _titleController.text = response.data['title'] ?? _titleController.text;
+            _isTitleGenerated = true;
+          } else {
+            _descriptionController.text = response.data['description'] ?? _descriptionController.text;
+            _isDescGenerated = true;
+          }
+        });
+      }
+    } catch (e) { print(e); }
+    setState(() { if (isTitle) _isGeneratingTitle = false; else _isGeneratingDesc = false; });
+  }
+
+  void _showAIReviewDialog() {
+    if (_aiSuggestion == null) return;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Row(children: [Icon(Icons.auto_awesome, color: AppColors.primary), SizedBox(width: 10), Text('AI Önerilerini İncele', style: TextStyle(color: Colors.white, fontSize: 18))]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildReviewItem('Marka', _aiSuggestion!['suggested_brand']),
+            _buildReviewItem('Model', _aiSuggestion!['suggested_model']),
+            _buildReviewItem('Yıl', _aiSuggestion!['suggested_year']?.toString()),
+            _buildReviewItem('Renk', _aiSuggestion!['suggested_color']),
+            _buildReviewItem('Direksiyon', _aiSuggestion!['suggested_steering']),
+            const SizedBox(height: 12),
+            const Text('* Onayladığınızda form otomatik dolacaktır.', style: TextStyle(color: AppColors.textHint, fontSize: 11, fontStyle: FontStyle.italic)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('İptal')),
+          ElevatedButton(
+            onPressed: () { Navigator.pop(context); _applyAISuggestion(); },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Onayla ve Doldur', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewItem(String label, String? value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('$label:', style: const TextStyle(color: AppColors.textHint, fontSize: 13)), Text(value ?? 'Bilinmiyor', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
+    );
+  }
+
+  void _applyAISuggestion() {
+    final lookups = _lookupService.data;
+    setState(() {
+      if (_aiSuggestion!['suggested_brand'] != null) {
+        try {
+          final brand = _allBrands.firstWhere((b) => b.name.toLowerCase() == _aiSuggestion!['suggested_brand'].toString().toLowerCase());
+          _onBrandTap(brand);
+          if (_aiSuggestion!['suggested_model'] != null) {
+            _titleController.text = "${brand.name} ${_aiSuggestion!['suggested_model']}";
+          }
+        } catch (_) {}
+      }
+      if (_aiSuggestion!['suggested_year'] != null) _yearController.text = _aiSuggestion!['suggested_year'].toString();
+      
+      if (_aiSuggestion!['suggested_color'] != null) {
+        final color = _aiSuggestion!['suggested_color'].toString();
+        if (lookups.colors.any((e) => e.labelTr == color)) _selectedColor = color;
+      }
+
+      if (_aiSuggestion!['suggested_steering'] != null) {
+        _selectedSteering = _aiSuggestion!['suggested_steering'] == 'Sağ' ? SteeringType.right : SteeringType.left;
+      }
+      _aiSuggestion = null;
     });
   }
 
   void _onBrandTap(BrandEntity brand) {
-    setState(() {
-      _selectedBrandEntity = brand;
-      _selectedSeriesEntity = null;
-      _selectedModelName = null;
-      _seriesModels = [];
-    });
+    setState(() { _selectedBrandEntity = brand; _selectedSeriesEntity = null; _selectedModelName = null; _seriesModels = []; });
     context.read<CarBloc>().add(GetSeriesAndModelsEvent(brandId: brand.id));
   }
 
   void _onSeriesTap(SeriesModels series) {
-    setState(() {
-      _selectedSeriesEntity = series;
-      _selectedModelName = null;
-      _models = series.models;
-    });
-  }
-
-  void _onModelTap(String modelName) {
-    setState(() => _selectedModelName = modelName);
+    setState(() { _selectedSeriesEntity = series; _selectedModelName = null; _models = series.models; });
   }
 
   @override
   Widget build(BuildContext context) {
     final lookups = _lookupService.data;
-
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Yeni İlan Yayınla', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Yeni İlan Ver', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: AppColors.background, elevation: 0),
       body: BlocConsumer<CarBloc, CarState>(
         listener: (context, state) {
-          if (state is AllBrandsLoaded) {
-            setState(() => _allBrands = state.brands);
-          } else if (state is SeriesAndModelsLoaded) {
-            setState(() => _seriesModels = state.seriesModels);
-          } else if (state is CarCreated) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('İlanınız başarıyla yayına alındı!'), backgroundColor: Colors.green));
-            context.read<CarBloc>().add(const GetCarsEvent(page: 1, limit: 20, sortBy: 'created_at', sortOrder: 'desc'));
-            Navigator.pop(context);
-          } else if (state is CarCreateError) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message), backgroundColor: AppColors.error));
-          }
+          if (state is AllBrandsLoaded) _allBrands = state.brands;
+          if (state is SeriesAndModelsLoaded) _seriesModels = state.seriesModels;
+          if (state is CarCreated) { Navigator.pop(context); }
         },
         builder: (context, state) {
-          final isSubmitting = state is CarCreating || _isUploading;
+          final isSubmitting = state is CarCreating;
           return Stack(
             children: [
               SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.all(20),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (_aiSuggestion != null) _buildAISuggestionCard(),
                       _buildSectionTitle('Araç Seçimi (Kademeli)'),
-                      const SizedBox(height: 12),
                       _buildFocusSelectionBand(),
-                      const SizedBox(height: 32),
-                      
-                      _buildSectionTitle('Araç Görselleri'),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 24),
+                      _buildSectionTitle('Fotoğraflar'),
                       _buildImagePickerBox(),
-                      const SizedBox(height: 32),
-
-                      _buildSectionTitle('Genel Bilgiler'),
+                      const SizedBox(height: 24),
+                      _buildSectionHeaderWithAI('İlan Başlığı', _isGeneratingTitle, _isTitleGenerated, () => _generateAIContent(true)),
+                      _buildTextField(_titleController, 'Etkileyici bir başlık girin', Icons.title),
                       const SizedBox(height: 16),
-                      _buildTextField(_titleController, 'İlan Başlığı', Icons.title, validator: _requiredValidator),
+                      Row(children: [
+                        Expanded(child: _buildTextField(_priceController, 'Fiyat', Icons.payments, keyboardType: TextInputType.number)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildDropdown<Currency>(label: 'Birim', value: _selectedCurrency, items: Currency.values.map((e) => DropdownMenuItem(value: e, child: Text(e.name.toUpperCase()))).toList(), onChanged: (v) => setState(() => _selectedCurrency = v!), icon: Icons.currency_exchange)),
+                      ]),
                       const SizedBox(height: 16),
-                      
-                      Row(
-                        children: [
-                          Expanded(child: _buildTextField(_priceController, 'Satış Fiyatı', Icons.payments_outlined, keyboardType: TextInputType.number, validator: _requiredValidator)),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildDropdown<Currency>(
-                            label: 'Birim',
-                            value: _selectedCurrency,
-                            items: Currency.values.map((e) => DropdownMenuItem(value: e, child: Text(e.name.toUpperCase().replaceAll('_', '')))).toList(),
-                            onChanged: (v) => setState(() => _selectedCurrency = v!),
-                            icon: Icons.currency_exchange,
-                          )),
-                        ],
-                      ),
+                      Row(children: [
+                        Expanded(child: _buildTextField(_yearController, 'Model Yılı', Icons.calendar_today, keyboardType: TextInputType.number)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildDropdown<String>(label: 'Renk', value: _selectedColor, items: lookups.colors.map((e) => DropdownMenuItem(value: e.labelTr, child: Text(e.labelTr))).toList(), onChanged: (v) => setState(() => _selectedColor = v), icon: Icons.palette)),
+                      ]),
                       const SizedBox(height: 16),
-
-                      Row(
-                        children: [
-                          Expanded(child: _buildTextField(_yearController, 'Üretim Yılı', Icons.calendar_today_outlined, keyboardType: TextInputType.number, validator: _requiredValidator)),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildDropdown<String>(
-                            label: 'Renk',
-                            value: _selectedColor,
-                            items: lookups.colors.map((e) => DropdownMenuItem(value: e.labelTr, child: Text(e.labelTr))).toList(),
-                            onChanged: (v) => setState(() => _selectedColor = v),
-                            icon: Icons.palette_outlined,
-                          )),
-                        ],
-                      ),
+                      Row(children: [
+                        Expanded(child: _buildTextField(_mileageController, 'Kilometre', Icons.speed, keyboardType: TextInputType.number)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildDropdown<MileageUnit>(label: 'Birim', value: _selectedMileageUnit, items: const [DropdownMenuItem(value: MileageUnit.km, child: Text('KM')), DropdownMenuItem(value: MileageUnit.miles, child: Text('Mil'))], onChanged: (v) => setState(() => _selectedMileageUnit = v!), icon: Icons.straighten)),
+                      ]),
                       const SizedBox(height: 16),
-
+                      _buildTextField(_engineSizeController, 'Motor Hacmi (cc)', Icons.shutter_speed, keyboardType: TextInputType.number),
+                      const SizedBox(height: 24),
                       _buildSectionTitle('Teknik Detaylar'),
+                      _buildDropdown<String>(label: 'Yakıt Tipi', value: _selectedFuelType, items: lookups.fuelTypes.map((e) => DropdownMenuItem(value: e.value, child: Text(e.labelTr))).toList(), onChanged: (v) => setState(() => _selectedFuelType = v), icon: Icons.local_gas_station),
                       const SizedBox(height: 16),
-                      _buildDropdown<String>(
-                        label: 'Yakıt Tipi',
-                        value: _selectedFuelType,
-                        items: lookups.fuelTypes.map((e) => DropdownMenuItem(value: e.value, child: Text(e.labelTr))).toList(),
-                        onChanged: (v) => setState(() => _selectedFuelType = v),
-                        icon: Icons.local_gas_station_outlined,
-                      ),
+                      Row(children: [
+                        Expanded(child: _buildDropdown<TransmissionType>(label: 'Vites', value: _selectedTransmission, items: TransmissionType.values.map((e) => DropdownMenuItem(value: e, child: Text(e.name))).toList(), onChanged: (v) => setState(() => _selectedTransmission = v!), icon: Icons.settings)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildDropdown<SteeringType>(label: 'Direksiyon', value: _selectedSteering, items: const [DropdownMenuItem(value: SteeringType.right, child: Text('Sağ')), DropdownMenuItem(value: SteeringType.left, child: Text('Sol'))], onChanged: (v) => setState(() => _selectedSteering = v!), icon: Icons.directions_car)),
+                      ]),
                       const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(child: _buildDropdown<TransmissionType>(
-                            label: 'Vites Türü',
-                            value: _selectedTransmission,
-                            items: TransmissionType.values.map((e) => DropdownMenuItem(value: e, child: Text(_getTransmissionLabel(e)))).toList(),
-                            onChanged: (v) => setState(() => _selectedTransmission = v!),
-                            icon: Icons.settings_input_component_outlined,
-                          )),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildDropdown<SteeringType>(
-                            label: 'Direksiyon',
-                            value: _selectedSteering,
-                            items: const [
-                              DropdownMenuItem(value: SteeringType.right, child: Text('Sağ Direksiyon')),
-                              DropdownMenuItem(value: SteeringType.left, child: Text('Sol Direksiyon')),
-                            ],
-                            onChanged: (v) => setState(() => _selectedSteering = v!),
-                            icon: Icons.directions_car_outlined,
-                          )),
-                        ],
-                      ),
+                      Row(children: [
+                        Expanded(child: _buildDropdown<String>(label: 'Şehir', value: _selectedCity, items: lookups.cities.map((e) => DropdownMenuItem(value: e.value, child: Text(e.labelTr))).toList(), onChanged: (v) => setState(() { _selectedCity = v; _selectedDistrict = null; }), icon: Icons.location_on)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _buildDropdown<String>(label: 'Kayıt Durumu', value: _registrationStatus, items: ["Kıbrıs Kayıtlı", "Gümrüksüz", "Ziyaretçi"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: (v) => setState(() => _registrationStatus = v), icon: Icons.assignment)),
+                      ]),
                       const SizedBox(height: 16),
-                      _buildDropdown<BodyType>(
-                        label: 'Kasa Tipi',
-                        value: _selectedBodyType,
-                        items: lookups.bodyTypes.map((e) {
-                          BodyType type = BodyType.values.firstWhere((bt) => bt.name == e.value.replaceAll('-', ''), orElse: () => BodyType.sedan);
-                          return DropdownMenuItem(value: type, child: Text(e.labelTr));
-                        }).toList(),
-                        onChanged: (v) => setState(() => _selectedBodyType = v!),
-                        icon: Icons.directions_car_filled_outlined,
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(child: _buildTextField(_mileageController, 'Kilometre (Odo)', Icons.speed, keyboardType: TextInputType.number, validator: _requiredValidator)),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildDropdown<MileageUnit>(
-                            label: 'Birim',
-                            value: _selectedMileageUnit,
-                            items: const [DropdownMenuItem(value: MileageUnit.km, child: Text('KM')), DropdownMenuItem(value: MileageUnit.miles, child: Text('Mil'))],
-                            onChanged: (v) => setState(() => _selectedMileageUnit = v!),
-                            icon: Icons.straighten,
-                          )),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _buildTextField(_engineSizeController, 'Motor Hacmi (örn: 1600)', Icons.shutter_speed_outlined, keyboardType: TextInputType.number),
-                      const SizedBox(height: 32),
-
-                      _buildSectionTitle('Konum & Kayıt'),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(child: _buildDropdown<String>(
-                            label: 'Şehir',
-                            value: _selectedCity,
-                            items: lookups.cities.map((e) => DropdownMenuItem(value: e.value, child: Text(e.labelTr))).toList(),
-                            onChanged: (v) => setState(() { _selectedCity = v; _selectedDistrict = null; }),
-                            icon: Icons.location_on_outlined,
-                          )),
-                          const SizedBox(width: 12),
-                          Expanded(child: _buildDropdown<String>(
-                            label: 'İlçe',
-                            value: _selectedDistrict,
-                            items: (lookups.cities.firstWhere((c) => c.value == _selectedCity, orElse: () => const CityLookup(id: 0, value: '', labelTr: '')).districts)
-                                .map((e) => DropdownMenuItem(value: e.value, child: Text(e.labelTr))).toList(),
-                            onChanged: (v) => setState(() => _selectedDistrict = v),
-                            icon: Icons.map_outlined,
-                            hint: _selectedCity == null ? 'Önce Şehir' : 'İlçe Seç',
-                          )),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _buildDropdown<String>(
-                        label: 'Kayıt Durumu',
-                        value: _registrationStatus,
-                        items: ["Kıbrıs Kayıtlı", "Gümrüksüz / Yeni İthal", "Ziyaretçi Plaka"]
-                            .map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                        onChanged: (v) => setState(() => _registrationStatus = v),
-                        icon: Icons.assignment_outlined,
-                      ),
-                      const SizedBox(height: 16),
-                      if (_registrationStatus == 'Kıbrıs Kayıtlı')
-                        _buildTextField(_licenseSeriesController, 'Plaka Serisi (örn: ZK, UB)', Icons.badge_outlined),
-                      
-                      const SizedBox(height: 12),
-                      _buildSwitchTile('Araç Takasa Uygun', _isExchangeable, (v) => setState(() => _isExchangeable = v)),
-
-                      const SizedBox(height: 32),
-                      _buildSectionTitle('Açıklama'),
-                      const SizedBox(height: 12),
-                      _buildTextField(_descriptionController, 'Araç durumu, ekstralar vb...', Icons.description_outlined, maxLines: 4),
-                      const SizedBox(height: 40),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: isSubmitting ? null : _submitForm,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.black,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            elevation: 0,
-                          ),
-                          child: isSubmitting 
-                            ? const CircularProgressIndicator(color: Colors.black)
-                            : const Text('İLANIN YAYINLA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      if (_registrationStatus == 'Kıbrıs Kayıtlı') ...[
+                        _buildTextField(_licenseSeriesController, 'Plaka Serisi (örn: ZK)', Icons.badge),
+                        const SizedBox(height: 16),
+                      ],
+                      Container(
+                        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12)),
+                        child: SwitchListTile(
+                          title: const Text('Takas Olur mu?', style: TextStyle(color: Colors.white, fontSize: 14)),
+                          value: _isExchangeable,
+                          onChanged: (v) => setState(() => _isExchangeable = v),
+                          activeTrackColor: AppColors.primary,
                         ),
                       ),
-                      const SizedBox(height: 60),
+                      const SizedBox(height: 24),
+                      _buildSectionHeaderWithAI('İlan Açıklaması', _isGeneratingDesc, _isDescGenerated, () => _generateAIContent(false)),
+                      _buildTextField(_descriptionController, 'Araç durumu, ekstralar vb...', Icons.description, maxLines: 4),
+                      const SizedBox(height: 40),
+                      SizedBox(width: double.infinity, height: 56, child: ElevatedButton(onPressed: isSubmitting ? null : _submitForm, style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))), child: isSubmitting ? const CircularProgressIndicator() : const Text('İLANIN YAYINLA', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)))),
+                      const SizedBox(height: 100),
                     ],
                   ),
                 ),
               ),
-              if (isSubmitting)
-                Container(
-                  color: Colors.black54,
-                  child: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-                ),
+              if (isSubmitting) Container(color: Colors.black54, child: const Center(child: CircularProgressIndicator())),
             ],
           );
         },
@@ -323,264 +326,138 @@ class _CreateListingPageState extends State<CreateListingPage> {
     );
   }
 
-  Widget _buildFocusSelectionBand() {
-    return BlocBuilder<CarBloc, CarState>(
-      buildWhen: (prev, curr) => curr is AllBrandsLoaded || curr is SeriesAndModelsLoaded,
-      builder: (context, state) {
-        if (state is AllBrandsLoaded) {
-          _allBrands = state.brands;
-        } else if (state is SeriesAndModelsLoaded) {
-          _seriesModels = state.seriesModels;
-        }
-
-        return AnimatedSwitcher(
-          duration: const Duration(milliseconds: 400),
-          child: Container(
-            key: ValueKey('${_selectedBrandEntity?.id}_${_selectedSeriesEntity?.series}_${_selectedModelName}'),
-            height: 110,
-            decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white.withOpacity(0.05))),
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              children: [
-                if (_selectedBrandEntity == null)
-                  ..._allBrands.map((b) => _buildSelectionCircle(
-                    label: b.name,
-                    image: b.logoUrl,
-                    onTap: () => _onBrandTap(b),
-                  ))
-                else if (_selectedSeriesEntity == null) ...[
-                  _buildSelectionCircle(image: _selectedBrandEntity!.logoUrl, label: _selectedBrandEntity!.name, isSelected: true, onTap: () => setState(() => _selectedBrandEntity = null)),
-                  const VerticalDivider(width: 30, thickness: 1, color: Colors.white10, indent: 25, endIndent: 25),
-                  ..._seriesModels.map((s) => _buildSelectionCircle(label: s.series, onTap: () => _onSeriesTap(s))),
-                ]
-                else ...[
-                  _buildSelectionCircle(image: _selectedBrandEntity!.logoUrl, label: _selectedBrandEntity!.name, isSelected: true, onTap: () => setState(() { _selectedBrandEntity = null; _selectedSeriesEntity = null; })),
-                  _buildSelectionCircle(label: _selectedSeriesEntity!.series, isSelected: true, onTap: () => setState(() => _selectedSeriesEntity = null)),
-                  const VerticalDivider(width: 30, thickness: 1, color: Colors.white10, indent: 25, endIndent: 25),
-                  ..._models.map((m) => _buildSelectionCircle(label: m, isSelected: _selectedModelName == m, onTap: () => _onModelTap(m))),
-                ]
-              ],
-            ),
-          ),
-        );
-      },
+  Widget _buildSectionHeaderWithAI(String title, bool loading, bool done, VoidCallback onTap) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildSectionTitle(title),
+        if (!done) TextButton.icon(
+          onPressed: loading ? null : onTap,
+          icon: loading ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome, size: 14, color: AppColors.primary),
+          label: Text(loading ? 'Yazılıyor...' : 'AI ile Yaz', style: const TextStyle(fontSize: 11, color: AppColors.primary)),
+        ) else const Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
+      ],
     );
   }
 
-  Widget _buildSelectionCircle({required String label, String? image, bool isSelected = false, required VoidCallback onTap}) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 12),
+  Widget _buildAISuggestionCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.primary.withOpacity(0.3))),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(25),
-            child: Container(
-              width: 54, height: 50,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : (image != null ? Colors.white : AppColors.background),
-                shape: BoxShape.circle,
-                border: Border.all(color: isSelected ? AppColors.primary : Colors.white10, width: 1.5),
-              ),
-              child: image != null 
-                ? CachedNetworkImage(imageUrl: image, fit: BoxFit.contain, errorWidget: (c,u,e) => const Icon(Icons.directions_car, size: 20, color: Colors.black54))
-                : Center(child: Text(label.substring(0, label.length > 3 ? 3 : label.length).toUpperCase(), style: TextStyle(color: isSelected ? Colors.black : AppColors.textPrimary, fontSize: 10, fontWeight: FontWeight.bold))),
-            ),
-          ),
-          const SizedBox(height: 4),
-          SizedBox(width: 60, child: Text(label, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: TextStyle(color: isSelected ? AppColors.primary : AppColors.textHint, fontSize: 9))),
+          Row(children: [const Icon(Icons.auto_awesome, color: AppColors.primary, size: 20), const SizedBox(width: 8), const Text('Yapay Zeka Önerisi', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)), const Spacer(), IconButton(onPressed: () => setState(() => _aiSuggestion = null), icon: const Icon(Icons.close, size: 18, color: AppColors.textHint))]),
+          const SizedBox(height: 8),
+          Text('Tespit edilen: ${_aiSuggestion!['suggested_brand'] ?? ''} ${_aiSuggestion!['suggested_model'] ?? ''}', style: const TextStyle(color: Colors.white, fontSize: 13)),
+          const SizedBox(height: 12),
+          SizedBox(width: double.infinity, child: TextButton(onPressed: _showAIReviewDialog, style: TextButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.black), child: const Text('Önerileri Gözden Geçir', style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(title, style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold));
-  }
-
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {TextInputType keyboardType = TextInputType.text, int maxLines = 1, String? Function(String?)? validator}) {
-    return TextFormField(
-      controller: controller,
-      style: const TextStyle(color: AppColors.textPrimary),
-      keyboardType: keyboardType,
-      maxLines: maxLines,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
-        prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
-        filled: true,
-        fillColor: AppColors.surface,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppColors.primary)),
-        errorStyle: const TextStyle(color: AppColors.error),
-      ),
-    );
-  }
-
-  Widget _buildDropdown<T>({required String label, required T? value, required List<DropdownMenuItem<T>> items, required ValueChanged<T?>? onChanged, required IconData icon, String? hint}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: AppColors.textHint, fontSize: 11, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<T>(
-              value: value,
-              items: items,
-              onChanged: onChanged,
-              isExpanded: true,
-              dropdownColor: AppColors.surface,
-              icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.primary, size: 18),
-              hint: Text(hint ?? 'Seçiniz', style: const TextStyle(color: AppColors.textHint, fontSize: 13)),
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSwitchTile(String title, bool value, ValueChanged<bool> onChanged) {
-    return Container(
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12)),
-      child: SwitchListTile(
-        title: Text(title, style: const TextStyle(color: AppColors.textPrimary, fontSize: 14)),
-        value: value,
-        onChanged: onChanged,
-        activeTrackColor: AppColors.primary,
-      ),
-    );
-  }
-
   Widget _buildImagePickerBox() {
-    return Column(
-      children: [
-        if (_selectedImages.isNotEmpty)
-          SizedBox(
-            height: 100,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: _selectedImages.length,
-              itemBuilder: (context, index) => Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: FutureBuilder<Uint8List>(
-                        future: _selectedImages[index].readAsBytes(),
-                        builder: (context, snapshot) {
-                          if (snapshot.hasData) {
-                            return Image.memory(
-                              snapshot.data!,
-                              width: 100,
-                              height: 100,
-                              fit: BoxFit.cover,
-                            );
-                          }
-                          return Container(width: 100, height: 100, color: AppColors.surface);
-                        },
-                      ),
-                    ),
-                    Positioned(top: 4, right: 4, child: GestureDetector(onTap: () => setState(() => _selectedImages.removeAt(index)), child: const CircleAvatar(radius: 10, backgroundColor: Colors.black54, child: Icon(Icons.close, size: 12, color: Colors.white)))),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        const SizedBox(height: 12),
-        InkWell(
-          onTap: () async {
-            final images = await ImagePicker().pickMultiImage(imageQuality: 70);
-            if (images.isNotEmpty) setState(() => _selectedImages.addAll(images));
-          },
-          child: Container(
-            width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 30),
-            decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.primary.withOpacity(0.3))),
-            child: Column(children: [const Icon(Icons.add_a_photo_outlined, color: AppColors.primary, size: 36), const SizedBox(height: 8), Text('Fotoğraf Ekle (Maks 10)', style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w600))]),
-          ),
+    return Column(children: [
+      if (_selectedImages.isNotEmpty) SizedBox(height: 80, child: ListView.builder(scrollDirection: Axis.horizontal, itemCount: _selectedImages.length, itemBuilder: (context, index) => Padding(padding: const EdgeInsets.only(right: 8), child: ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(_selectedImages[index].path, width: 80, height: 80, fit: BoxFit.cover))))),
+      const SizedBox(height: 12),
+      InkWell(
+        onTap: _isUploading ? null : () async {
+          final imgs = await ImagePicker().pickMultiImage();
+          if (imgs.isNotEmpty) { setState(() { _isUploading = true; _selectedImages.addAll(imgs); }); _startBackgroundAnalysis(imgs); }
+        },
+        child: Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 24), decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.primary.withOpacity(0.2))), child: Column(children: [ _isUploading ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.add_a_photo, color: AppColors.primary), const SizedBox(height: 8), Text(_isUploading ? 'Analiz Ediliyor...' : 'Fotoğraf Ekle', style: const TextStyle(color: AppColors.primary))])),
+      )
+    ]);
+  }
+
+  Widget _buildFocusSelectionBand() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      child: Container(
+        key: ValueKey('${_selectedBrandEntity?.id}_${_selectedSeriesEntity?.id}_$_selectedModelName'),
+        height: 110,
+        margin: const EdgeInsets.only(top: 10),
+        decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(16)),
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          children: [
+            if (_selectedBrandEntity == null) ..._allBrands.map((b) => _buildSelectionCircle(b.name, b.logoUrl, () => _onBrandTap(b)))
+            else ...[
+              _buildSelectionCircle(_selectedBrandEntity!.name, _selectedBrandEntity!.logoUrl, () => setState(() => _selectedBrandEntity = null), isSelected: true),
+              const VerticalDivider(color: Colors.white10, indent: 25, endIndent: 25),
+              if (_selectedSeriesEntity == null) ..._seriesModels.map((s) => _buildSelectionCircle(s.series, null, () => _onSeriesTap(s)))
+              else ...[
+                _buildSelectionCircle(_selectedSeriesEntity!.series, null, () => setState(() => _selectedSeriesEntity = null), isSelected: true),
+                const VerticalDivider(color: Colors.white10, indent: 25, endIndent: 25),
+                ..._models.map((m) => _buildSelectionCircle(m, null, () => setState(() => _selectedModelName = m), isSelected: _selectedModelName == m))
+              ]
+            ]
+          ],
         ),
-      ],
+      ),
     );
   }
 
-  String _getTransmissionLabel(TransmissionType e) {
-    switch(e) {
-      case TransmissionType.manual: return 'Manuel';
-      case TransmissionType.automatic: return 'Otomatik';
-      case TransmissionType.semiAutomatic: return 'Yarı Otomatik';
-    }
+  Widget _buildSelectionCircle(String label, String? img, VoidCallback onTap, {bool isSelected = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 70, padding: const EdgeInsets.all(8),
+        child: Column(children: [
+          Container(width: 50, height: 50, decoration: BoxDecoration(color: isSelected ? AppColors.primary : Colors.white, shape: BoxShape.circle), child: img != null ? CachedNetworkImage(imageUrl: img, fit: BoxFit.contain) : Center(child: Text(label[0], style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)))),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 9), overflow: TextOverflow.ellipsis)
+        ]),
+      ),
+    );
   }
 
-  String? _requiredValidator(String? value) => value == null || value.trim().isEmpty ? 'Bu alan zorunludur' : null;
+  Widget _buildSectionTitle(String title) => Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)));
+
+  Widget _buildTextField(TextEditingController ctrl, String label, IconData icon, {TextInputType keyboardType = TextInputType.text, int maxLines = 1}) {
+    return TextFormField(controller: ctrl, maxLines: maxLines, keyboardType: keyboardType, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: InputDecoration(labelText: label, labelStyle: const TextStyle(color: AppColors.textHint), prefixIcon: Icon(icon, color: AppColors.primary, size: 20), filled: true, fillColor: AppColors.surface, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)));
+  }
+
+  Widget _buildDropdown<T>({required String label, required T? value, required List<DropdownMenuItem<T>> items, required ValueChanged<T?> onChanged, required IconData icon}) {
+    return Container(padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12)), child: DropdownButtonHideUnderline(child: DropdownButton<T>(value: value, items: items, onChanged: onChanged, isExpanded: true, dropdownColor: AppColors.surface, style: const TextStyle(color: Colors.white, fontSize: 14))));
+  }
 
   Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate() || _selectedBrandEntity == null || _selectedSeriesEntity == null || _selectedModelName == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lütfen tüm zorunlu alanları ve araç seçimini tamamlayın.')));
-      return;
-    }
-
-    setState(() => _isUploading = true);
+    if (!_formKey.currentState!.validate() || _selectedBrandEntity == null) return;
     
-    List<String> imageUrls = [];
-    try {
-      if (_selectedImages.isNotEmpty) {
-        final dio = di.sl<Dio>();
-        final formData = FormData();
-        for (final image in _selectedImages) {
-          final bytes = await image.readAsBytes();
-          formData.files.add(MapEntry('files', MultipartFile.fromBytes(bytes, filename: image.name)));
-        }
-        final response = await dio.post('/upload/images', data: formData);
-        imageUrls = (response.data as List).map((e) => e as String).toList();
-      }
-    } catch (e) {
-      setState(() => _isUploading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Resim yükleme hatası: $e')));
-      return;
-    }
-
     final car = CarEntity(
-      title: _titleController.text.trim(),
+      title: _titleController.text,
       brand: _selectedBrandEntity!.name,
-      model: "${_selectedSeriesEntity!.series} ${_selectedModelName!}", // Örn: "A3 30 TFSI Sport"
-      year: int.parse(_yearController.text),
-      price: double.parse(_priceController.text),
+      model: "${_selectedSeriesEntity?.series ?? ''} ${_selectedModelName ?? ''}",
+      year: int.tryParse(_yearController.text) ?? 2024,
+      price: double.tryParse(_priceController.text) ?? 0,
       currency: _selectedCurrency,
-      mileage: int.parse(_mileageController.text),
-      mileageUnit: _selectedMileageUnit,
-      city: _selectedCity!,
+      city: _selectedCity ?? 'Lefkoşa',
       district: _selectedDistrict,
-      color: _selectedColor!,
+      color: _selectedColor ?? 'Beyaz',
+      mileage: int.tryParse(_mileageController.text) ?? 0,
+      mileageUnit: _selectedMileageUnit,
+      engineSize: int.tryParse(_engineSizeController.text) ?? 0,
       fuelType: _selectedFuelType,
       bodyType: _selectedBodyType,
       transmission: _selectedTransmission,
       steering: _selectedSteering,
-      engineSize: int.tryParse(_engineSizeController.text) ?? 0,
-      steeringSide: _getSteeringSideLabel(_selectedSteering),
-      imageUrls: imageUrls,
-      description: _descriptionController.text,
-      registrationStatus: _registrationStatus!,
+      steeringSide: _selectedSteering == SteeringType.right ? 'Sağ' : 'Sol',
+      registrationStatus: _registrationStatus ?? 'Kıbrıs Kayıtlı',
       licenseSeries: _licenseSeriesController.text,
+      isExchangeable: _isExchangeable,
+      description: _descriptionController.text,
+      imageUrls: _uploadedImageUrls, 
     );
-
     context.read<CarBloc>().add(CreateCarEvent(car: car));
-    setState(() => _isUploading = false);
-  }
-
-  String _getSteeringSideLabel(SteeringType type) {
-    return type == SteeringType.right ? 'Sağ' : 'Sol';
   }
 
   @override
   void dispose() {
+    if (!kIsWeb) _imageLabeler.close();
     _titleController.dispose(); _yearController.dispose(); _engineSizeController.dispose();
     _mileageController.dispose(); _priceController.dispose(); _descriptionController.dispose();
     _licenseSeriesController.dispose();

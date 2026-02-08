@@ -11,6 +11,7 @@ import '../../core/utils/ui_helpers.dart';
 import '../bloc/car/car_bloc.dart';
 import '../bloc/car/car_event.dart';
 import '../bloc/car/car_state.dart';
+import 'public_profile_page.dart';
 
 class CarDetailPage extends StatefulWidget {
   final CarEntity car;
@@ -82,9 +83,7 @@ class _CarDetailPageState extends State<CarDetailPage> {
                 const SizedBox(height: 24),
                 _buildPriceSection(),
                 const SizedBox(height: 32),
-                _buildQuickSpecs(),
-                const SizedBox(height: 32),
-                _buildSectionTitle('Teknik Detaylar'),
+                _buildSectionTitle('Teknik Bilgiler'),
                 const SizedBox(height: 16),
                 _buildDetailsTable(),
                 const SizedBox(height: 32),
@@ -160,28 +159,58 @@ class _CarDetailPageState extends State<CarDetailPage> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('SATIŞ FİYATI', style: TextStyle(color: AppColors.textHint, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
-              const SizedBox(height: 4),
-              Text(
-                UIHelpers.formatPriceWithConversion(
-                  _currentCar.price,
-                  originalCurrency: _currentCar.currency,
-                  displayCurrency: _displayCurrency,
-                  gbpToTryRate: _currentCar.exchangeRates?.gbpToTry,
-                ),
-                style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: AppColors.primary),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('SATIŞ FİYATI', style: TextStyle(color: AppColors.textHint, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                  const SizedBox(height: 4),
+                  Text(
+                    UIHelpers.formatPriceWithConversion(
+                      _currentCar.price,
+                      originalCurrency: _currentCar.currency,
+                      displayCurrency: _displayCurrency,
+                      gbpToTryRate: _currentCar.exchangeRates?.gbpToTry,
+                    ),
+                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: AppColors.primary),
+                  ),
+                ],
               ),
+              _buildCurrencyToggle(),
             ],
           ),
-          _buildCurrencyToggle(),
+          const SizedBox(height: 16),
+          const Divider(color: Colors.white10),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildPriceInfoItem(Icons.calendar_today_outlined, '${_currentCar.year}', 'Model Yılı'),
+              _buildPriceInfoItem(Icons.speed, '${UIHelpers.formatMileage(_currentCar.mileage)} ${_currentCar.mileageUnit.name.toUpperCase()}', 'Kilometre'),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPriceInfoItem(IconData icon, String value, String label) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 18),
+        const SizedBox(width: 10),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
+            Text(label, style: const TextStyle(color: AppColors.textHint, fontSize: 11)),
+          ],
+        ),
+      ],
     );
   }
 
@@ -203,34 +232,6 @@ class _CarDetailPageState extends State<CarDetailPage> {
     );
   }
 
-  Widget _buildQuickSpecs() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _buildSpecItem(Icons.calendar_today_outlined, '${_currentCar.year}', 'Model Yılı'),
-        _buildSpecItem(Icons.speed, '${_currentCar.mileage} ${_currentCar.mileageUnit.name.toUpperCase()}', 'Kilometre'),
-        _buildSpecItem(Icons.settings_input_component_outlined, UIHelpers.translateTransmission(_currentCar.transmission), 'Vites'),
-      ],
-    );
-  }
-
-  Widget _buildSpecItem(IconData icon, String value, String label) {
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: AppColors.surface, shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.05))),
-            child: Icon(icon, color: AppColors.primary, size: 24),
-          ),
-          const SizedBox(height: 10),
-          Text(value, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
-          Text(label, style: const TextStyle(color: AppColors.textHint, fontSize: 11)),
-        ],
-      ),
-    );
-  }
-
   Widget _buildDetailsTable() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -241,6 +242,9 @@ class _CarDetailPageState extends State<CarDetailPage> {
       ),
       child: Column(
         children: [
+          _buildDetailRow('Model Yılı', '${_currentCar.year}'),
+          _buildDetailRow('Kilometre', '${UIHelpers.formatMileage(_currentCar.mileage)} ${_currentCar.mileageUnit.name.toUpperCase()}'),
+          _buildDetailRow('Vites', UIHelpers.translateTransmission(_currentCar.transmission)),
           _buildDetailRow('Yakıt Tipi', UIHelpers.translateFuelType(_currentCar.fuelType)),
           _buildDetailRow('Kasa Tipi', UIHelpers.translateBodyType(_currentCar.bodyType)),
           _buildDetailRow('Motor Hacmi', '${_currentCar.engineSize} cc'),
@@ -276,10 +280,11 @@ class _CarDetailPageState extends State<CarDetailPage> {
           width: double.infinity,
           child: PageView.builder(
             itemCount: images.isEmpty ? 1 : images.length,
+            physics: const BouncingScrollPhysics(),
             onPageChanged: (i) => setState(() => _currentImageIndex = i),
             itemBuilder: (context, index) {
               return Hero(
-                tag: 'car_${_currentCar.id}',
+                tag: 'car_${_currentCar.id}_$index',
                 child: CachedNetworkImage(
                   imageUrl: images.isNotEmpty ? images[index] : 'https://via.placeholder.com/600x400',
                   fit: BoxFit.cover,
@@ -360,35 +365,45 @@ class _CarDetailPageState extends State<CarDetailPage> {
 
   Widget _buildSellerCard() {
     final owner = _currentCar.owner;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: AppColors.primary.withOpacity(0.1),
-            backgroundImage: owner?.profileImageUrl != null ? NetworkImage(owner!.profileImageUrl!) : null,
-            child: owner?.profileImageUrl == null ? const Icon(Icons.person, color: AppColors.primary, size: 30) : null,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(owner?.fullName ?? 'Bilinmeyen Satıcı', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.textPrimary)),
-                const SizedBox(height: 4),
-                Text(owner?.companyName ?? 'Bireysel Satıcı', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
-              ],
+    return GestureDetector(
+      onTap: owner != null ? () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => PublicProfilePage(user: owner)),
+        );
+      } : null,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 32,
+              backgroundColor: AppColors.primary.withOpacity(0.1),
+              backgroundImage: owner?.profileImageUrl != null ? NetworkImage(owner!.profileImageUrl!) : null,
+              child: owner?.profileImageUrl == null ? const Icon(Icons.person, color: AppColors.primary, size: 30) : null,
             ),
-          ),
-          if (owner?.isVerified == true)
-            const Icon(Icons.verified, color: AppColors.primary, size: 22),
-        ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(owner?.fullName ?? 'Bilinmeyen Satıcı', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.textPrimary)),
+                  const SizedBox(height: 4),
+                  Text(owner?.companyName ?? 'Bireysel Satıcı', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios, color: AppColors.textHint, size: 16),
+            const SizedBox(width: 8),
+            if (owner?.isVerified == true)
+              const Icon(Icons.verified, color: AppColors.primary, size: 22),
+          ],
+        ),
       ),
     );
   }
@@ -430,7 +445,7 @@ class _CarDetailPageState extends State<CarDetailPage> {
               ),
               child: IconButton(
                 onPressed: hasPhone ? () => launchUrl(Uri.parse('https://wa.me/${owner!.phoneNumber}'), mode: LaunchMode.externalApplication) : null,
-                icon: const Icon(Icons.chat_bubble_outline, color: Colors.white, size: 24),
+                icon: const Icon(Icons.chat_bubble, color: Colors.white, size: 28),
                 padding: const EdgeInsets.all(18),
               ),
             ),

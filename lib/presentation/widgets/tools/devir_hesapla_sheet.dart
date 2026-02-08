@@ -12,9 +12,9 @@ class DevirHesaplaOptionsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -22,10 +22,10 @@ class DevirHesaplaOptionsSheet extends StatelessWidget {
         children: [
           Container(
             width: 40, height: 4,
-            decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+            decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)),
           ),
           const SizedBox(height: 24),
-          const Text('Araç Devir Hesaplayıcı', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          const Text('Araç Devir Hesaplayıcı', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           const Text('2026 KKTC Mevzuatına Göre', style: TextStyle(color: AppColors.textHint)),
           const SizedBox(height: 32),
@@ -220,9 +220,9 @@ class _DevirHesaplaFormState extends State<DevirHesaplaForm> {
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.9,
-      decoration: const BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Column(
@@ -230,7 +230,7 @@ class _DevirHesaplaFormState extends State<DevirHesaplaForm> {
           const SizedBox(height: 12),
           Container(
             width: 40, height: 4,
-            decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+            decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)),
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -240,7 +240,7 @@ class _DevirHesaplaFormState extends State<DevirHesaplaForm> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Hesaplama Bilgileri', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                    const Text('Hesaplama Bilgileri', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 24),
                     
                     Row(
